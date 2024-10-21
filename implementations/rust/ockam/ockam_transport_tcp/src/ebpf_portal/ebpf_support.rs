@@ -8,6 +8,7 @@ use aya::programs::{tc, Link, ProgramError, SchedClassifier, TcAttachType};
 use aya::{Ebpf, EbpfError};
 use aya_log::EbpfLogger;
 use core::fmt::{Debug, Formatter};
+use log::error;
 use ockam_core::compat::collections::HashMap;
 use ockam_core::errcode::{Kind, Origin};
 use ockam_core::{Address, Error, Result};
