@@ -49,6 +49,8 @@ ebpf = ["ockam_transport_tcp/ebpf"]
 cfg_aliases = "0.2.1"
 
 [dependencies]
+aws-config = { version = "1.0.1", features = ["behavior-version-latest"] }
+aws-sdk-s3 = { version = "1.4.0", features = ["rt-tokio"] }
 base64-url = "3.0.0"
 bytes = { version = "1.7.2", default-features = false, features = ["serde"] }
 cfg-if = "1.0.0"
@@ -58,6 +60,7 @@ colorful = "0.3"
 colors-transform = "0.2"
 dialoguer = "0.11"
 either = { version = "1.13.0", default-features = false }
+flate2 = "1.0"
 flexi_logger = "0.28"
 futures = { version = "0.3.30", features = [] }
 gethostname = "0.5.0"
@@ -118,6 +121,7 @@ ockam_multiaddr = { path = "../ockam_multiaddr", version = "0.63.0", features = 
 ockam_transport_core = { path = "../ockam_transport_core", version = "^0.96.0" }
 ockam_transport_tcp = { path = "../ockam_transport_tcp", version = "^0.129.0", default-features = false, features = ["std"] }
 tonic = "0.12"
+config = "0.14.1"
 
 [dependencies.ockam_core]
 version = "0.119.0"
