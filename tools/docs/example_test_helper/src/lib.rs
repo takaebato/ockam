@@ -4,7 +4,7 @@
 //! described by command lines.
 //!
 //! Processes have these environment variables set...
-//! - `OCKAM_LOG=trace`
+//! - `OCKAM_LOGGING=true; OCKAM_LOG_LEVEL=trace`
 //!
 //! Some functions will timeout if [`DEFAULT_TIMEOUT_MS`] milliseconds
 //! pass. In particular [`CmdBuilder::run()`], but not [`CmdBuilder::spawn()`].
@@ -57,7 +57,8 @@ use tracing_subscriber::fmt::TestWriter;
 use tracing_subscriber::{filter::LevelFilter, fmt, EnvFilter};
 
 const POLL_MS: u32 = 250;
-const ENVIRONMENT_VARIABLES: &[(&str, &str)] = &[("OCKAM_LOG", "trace")];
+const ENVIRONMENT_VARIABLES: &[(&str, &str)] =
+    &[("OCKAM_LOGGING", "true"), ("OCKAM_LOG_LEVEL", "trace")];
 
 /// Default timeout value in milliseconds.
 pub const DEFAULT_TIMEOUT_MS: u32 = 180_000;

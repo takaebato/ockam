@@ -13,7 +13,6 @@ CLI Behavior
 - PAGER: a `string` that defines the pager to use for long help/usage messages. Defaults to `less`.
 
 Logging
-- OCKAM_LOG (deprecated, use OCKAM_LOGGING and OCKAM_LOG_LEVEL instead): a `string` that defines the verbosity of the logs when the `--verbose` argument is not passed: `info`, `warn`, `error`, `debug` or `trace`.
 - OCKAM_LOGGING: set this variable to any value in order to enable logging.
 - OCKAM_LOG_LEVEL: a `string` that defines the verbosity of the logs when the `--verbose` argument is not passed: `info`, `warn`, `error`, `debug` or `trace`. Default value: `debug`.
 - OCKAM_LOG_FORMAT: a `string` that overrides the default format of the logs: `default`, `json`, or `pretty`. Default value: `default`.
