@@ -346,12 +346,15 @@ impl CreateCommand {
                 if let Ok(identity) = opts.state.get_named_identity(name).await {
                     identity.name()
                 } else {
-                    opts.state.create_identity_with_name(name).await?.name()
+                    opts.state
+                        .create_identity_with_name(None, name)
+                        .await?
+                        .name()
                 }
             }
             None => opts
                 .state
-                .get_or_create_default_named_identity()
+                .get_or_create_default_named_identity(None)
                 .await?
                 .name(),
         })
@@ -547,7 +550,7 @@ mod tests {
     async fn get_default_node_name_with_previous_state() {
         let state = CliState::test().await.unwrap();
         let default_node_name = "n1";
-        state.create_node(default_node_name).await.unwrap();
+        state.create_test_node(default_node_name).await.unwrap();
 
         let cmd = CreateCommand::default();
         let name = cmd.get_default_node_name(&state).await;
