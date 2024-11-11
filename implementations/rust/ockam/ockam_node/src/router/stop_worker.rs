@@ -27,30 +27,30 @@ pub(super) async fn exec(
         }
     };
 
-    // Get the internal address record
-    let record = match router.map.get_address_record_mut(&primary_address) {
-        Some(r) => r,
-        None => {
-            // Actually should not happen
-            reply
-                .send(RouterReply::no_such_address(addr.clone()))
-                .await
-                .map_err(|_| NodeError::NodeState(NodeReason::Unknown).internal())?;
-
-            return Ok(());
-        }
-    };
-
-    // If we are dropping a real worker, then we simply close the
-    // mailbox channel to trigger a graceful worker self-shutdown.
+    // // Get the internal address record
+    // let record = match router.map.get_address_record_mut(&primary_address) {
+    //     Some(r) => r,
+    //     None => {
+    //         // Actually should not happen
+    //         reply
+    //             .send(RouterReply::no_such_address(addr.clone()))
+    //             .await
+    //             .map_err(|_| NodeError::NodeState(NodeReason::Unknown).internal())?;
     //
-    // For detached workers (i.e. Context's without a mailbox relay
-    // running) we simply drop the record
-    if !detached {
-        record.stop().await?
-    } else {
-        router.map.free_address(primary_address);
-    }
+    //         return Ok(());
+    //     }
+    // };
+
+    // // If we are dropping a real worker, then we simply close the
+    // // mailbox channel to trigger a graceful worker self-shutdown.
+    // //
+    // // For detached workers (i.e. Context's without a mailbox relay
+    // // running) we simply drop the record
+    // if !detached {
+    //     record.stop().await?
+    // } else {
+    //     router.map.free_address(primary_address);
+    // }
 
     reply
         .send(RouterReply::ok())

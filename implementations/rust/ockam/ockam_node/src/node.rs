@@ -129,6 +129,7 @@ impl NodeBuilder {
         // messages from workers, and to buffer incoming transcoded data.
         let (ctx, sender, _) = Context::new(
             rt.handle().clone(),
+            exe.router_internal_map(),
             exe.sender(),
             Mailboxes::new(
                 Mailbox::new(addr, Arc::new(AllowAll), Arc::new(AllowAll)),

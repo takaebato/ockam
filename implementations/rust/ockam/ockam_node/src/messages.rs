@@ -54,8 +54,6 @@ pub enum NodeMessage {
     AbortNode,
     /// Let the router know a particular address has stopped
     StopAck(Address),
-    /// Request the sender for a worker address
-    SenderReq(Address, SmallSender<NodeReplyResult>),
     /// Register a new router for a route id type
     Router(TransportType, Address, SmallSender<NodeReplyResult>),
     /// Message the router to set an address as "ready"
@@ -81,7 +79,6 @@ impl fmt::Display for NodeMessage {
             NodeMessage::StopNode(_, _) => write!(f, "StopNode"),
             NodeMessage::AbortNode => write!(f, "AbortNode"),
             NodeMessage::StopAck(_) => write!(f, "StopAck"),
-            NodeMessage::SenderReq(_, _) => write!(f, "SenderReq"),
             NodeMessage::Router(_, _, _) => write!(f, "Router"),
             NodeMessage::SetReady(_) => write!(f, "SetReady"),
             NodeMessage::CheckReady(_, _) => write!(f, "CheckReady"),
@@ -173,12 +170,6 @@ impl NodeMessage {
     pub fn stop_node(tt: ShutdownType) -> (Self, SmallReceiver<NodeReplyResult>) {
         let (tx, rx) = small_channel();
         (Self::StopNode(tt, tx), rx)
-    }
-
-    /// Create a sender request message and reply receiver
-    pub fn sender_request(route: Address) -> (Self, SmallReceiver<NodeReplyResult>) {
-        let (tx, rx) = small_channel();
-        (Self::SenderReq(route, tx), rx)
     }
 
     /// Create a SetReady message and reply receiver

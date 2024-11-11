@@ -26,22 +26,22 @@ pub(super) async fn exec(
         }
     };
 
-    // Get the internal address record
-    let record = match router.map.get_address_record_mut(&primary_address) {
-        Some(r) => r,
-        None => {
-            // Actually should not happen
-            reply
-                .send(RouterReply::no_such_address(addr.clone()))
-                .await
-                .map_err(|_| NodeError::NodeState(NodeReason::Unknown).internal())?;
-
-            return Ok(());
-        }
-    };
-
-    // Then send processor shutdown signal
-    record.stop().await?;
+    // // Get the internal address record
+    // let record = match router.map.get_address_record_mut(&primary_address) {
+    //     Some(r) => r,
+    //     None => {
+    //         // Actually should not happen
+    //         reply
+    //             .send(RouterReply::no_such_address(addr.clone()))
+    //             .await
+    //             .map_err(|_| NodeError::NodeState(NodeReason::Unknown).internal())?;
+    //
+    //         return Ok(());
+    //     }
+    // };
+    //
+    // // Then send processor shutdown signal
+    // record.stop().await?;
 
     // Signal back that everything went OK
     reply

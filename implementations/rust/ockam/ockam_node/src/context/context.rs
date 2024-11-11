@@ -14,6 +14,7 @@ use ockam_core::{
     Result, TransportType,
 };
 
+use crate::router::record::InternalMapSharedState;
 #[cfg(feature = "std")]
 use core::fmt::{Debug, Formatter};
 use ockam_core::errcode::{Kind, Origin};
@@ -24,6 +25,7 @@ pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// Context contains Node state and references to the runtime.
 pub struct Context {
+    pub(super) router_map: InternalMapSharedState,
     pub(super) mailboxes: Mailboxes,
     pub(super) sender: SmallSender<NodeMessage>,
     pub(super) rt: Handle,

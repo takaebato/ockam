@@ -5,8 +5,6 @@ use crate::{
     NodeReplyResult, RouterReason, RouterReply,
 };
 use ockam_core::compat::{sync::Arc, vec::Vec};
-#[cfg(feature = "std")]
-use ockam_core::env::get_env;
 use ockam_core::{Address, AddressAndMetadata, Result};
 
 /// Execute a `StartWorker` command
@@ -73,15 +71,6 @@ async fn start(
 
         router.map.set_address_metadata(metadata);
     }
-
-    #[cfg(feature = "std")]
-    if let Ok(Some(dump_internals)) = get_env::<bool>("OCKAM_DUMP_INTERNALS") {
-        if dump_internals {
-            trace!("{:#?}", router.map.address_records_map());
-        }
-    }
-    #[cfg(all(not(feature = "std"), feature = "dump_internals"))]
-    trace!("{:#?}", router.map.address_records_map());
 
     addrs.iter().for_each(|addr| {
         router.map.insert_alias(addr, primary_addr);

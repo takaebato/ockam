@@ -61,7 +61,7 @@ mod messages;
 mod node;
 mod processor_builder;
 mod relay;
-mod router;
+pub mod router;
 
 /// Support for storing persistent values
 pub mod storage;

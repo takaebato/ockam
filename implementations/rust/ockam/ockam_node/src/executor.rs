@@ -22,6 +22,7 @@ use core::sync::atomic::{AtomicBool, Ordering};
 #[cfg(feature = "std")]
 use opentelemetry::trace::FutureExt;
 
+use crate::router::record::InternalMapSharedState;
 use ockam_core::flow_control::FlowControls;
 #[cfg(feature = "std")]
 use ockam_core::{
@@ -66,6 +67,10 @@ impl Executor {
     /// Get access to the internal message sender
     pub(crate) fn sender(&self) -> SmallSender<NodeMessage> {
         self.router.sender()
+    }
+
+    pub(crate) fn router_internal_map(&self) -> InternalMapSharedState {
+        self.router.internal_map()
     }
 
     /// Initialize the root application worker

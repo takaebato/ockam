@@ -1,53 +1,39 @@
 use super::Router;
-use crate::channel_types::SmallSender;
-use crate::{
-    error::{NodeError, NodeReason, WorkerReason},
-    NodeReplyResult, RouterReply,
-};
-use ockam_core::{Address, Result, TransportType};
+use crate::channel_types::MessageSender;
+use crate::error::{NodeError, NodeReason};
+use crate::router::record::InternalMapSharedState;
+use ockam_core::errcode::{Kind, Origin};
+use ockam_core::{Address, Error, RelayMessage, Result, TransportType};
 
 /// Receive an address and resolve it to a sender
 ///
 /// This function only applies to local address types, and will
 /// fail to resolve a correct address if it given a remote
 /// address.
-pub(super) async fn resolve(
-    router: &mut Router,
+pub(crate) fn resolve(
+    map: &InternalMapSharedState,
     addr: Address,
-    reply: &SmallSender<NodeReplyResult>,
-) -> Result<()> {
+) -> Result<(Address, MessageSender<RelayMessage>)> {
     let base = format!("Resolving worker address '{}'...", addr);
 
-    let address_record = if let Some(primary_address) = router.map.get_primary_address(&addr) {
-        router.map.get_address_record(primary_address)
+    let address_record = if let Some(primary_address) = map.get_primary_address(&addr) {
+        map.get_address_sender(&primary_address)
     } else {
         trace!("{} FAILED; no such worker", base);
-        reply
-            .send(RouterReply::no_such_address(addr))
-            .await
-            .map_err(NodeError::from_send_err)?;
 
-        return Ok(());
+        return Err(Error::new(Origin::Api, Kind::Other, ""));
     };
 
     match address_record {
-        Some(record) if record.check() => {
+        Some(record) => {
             trace!("{} OK", base);
-            record.increment_msg_count();
-            reply.send(RouterReply::sender(addr, record.sender()))
-        }
-        Some(_) => {
-            trace!("{} REJECTED; worker shutting down", base);
-            reply.send(RouterReply::worker_rejected(WorkerReason::Shutdown))
+            Ok((addr, record))
         }
         None => {
             trace!("{} FAILED; no such worker", base);
-            reply.send(RouterReply::no_such_address(addr))
+            Err(Error::new(Origin::Api, Kind::Other, ""))
         }
     }
-    .await
-    .map_err(NodeError::from_send_err)?;
-    Ok(())
 }
 
 pub(super) fn router_addr(router: &mut Router, tt: TransportType) -> Result<Address> {

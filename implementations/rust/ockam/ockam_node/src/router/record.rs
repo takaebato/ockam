@@ -15,13 +15,37 @@ use ockam_core::{
     flow_control::FlowControls,
     Address, AddressAndMetadata, AddressMetadata, RelayMessage, Result,
 };
+use std::collections::HashMap;
+use std::sync::RwLock;
+
+#[derive(Clone, Default)]
+pub struct InternalMapSharedState {
+    /// Registry of primary address to worker address record state
+    pub(super) address_records_map: Arc<RwLock<HashMap<Address, AddressRecord>>>,
+    /// Alias-registry to map arbitrary address to primary addresses
+    pub(super) alias_map: Arc<RwLock<HashMap<Address, Address>>>,
+}
+
+impl InternalMapSharedState {
+    pub(super) fn get_primary_address(&self, alias_address: &Address) -> Option<Address> {
+        self.alias_map.read().unwrap().get(alias_address).cloned()
+    }
+
+    pub(super) fn get_address_sender(
+        &self,
+        primary_address: &Address,
+    ) -> Option<MessageSender<RelayMessage>> {
+        self.address_records_map
+            .read()
+            .unwrap()
+            .get(primary_address)
+            .and_then(|r| r.sender.clone())
+    }
+}
 
 /// Address states and associated logic
 pub struct InternalMap {
-    /// Registry of primary address to worker address record state
-    address_records_map: BTreeMap<Address, AddressRecord>,
-    /// Alias-registry to map arbitrary address to primary addresses
-    alias_map: BTreeMap<Address, Address>,
+    pub(super) shared_state: InternalMapSharedState,
     /// Registry of arbitrary metadata for each address, lazily populated
     address_metadata_map: BTreeMap<Address, AddressMetadata>,
     /// The order in which clusters are allocated and de-allocated
@@ -40,8 +64,7 @@ pub struct InternalMap {
 impl InternalMap {
     pub(super) fn new(flow_controls: &FlowControls) -> Self {
         Self {
-            address_records_map: Default::default(),
-            alias_map: Default::default(),
+            shared_state: Default::default(),
             address_metadata_map: Default::default(),
             cluster_order: Default::default(),
             clusters: Default::default(),
@@ -55,30 +78,34 @@ impl InternalMap {
 
 impl InternalMap {
     pub(super) fn clear_address_records_map(&mut self) {
-        self.address_records_map.clear()
+        self.shared_state
+            .address_records_map
+            .write()
+            .unwrap()
+            .clear()
     }
 
-    pub(super) fn get_address_record(&self, primary_address: &Address) -> Option<&AddressRecord> {
-        self.address_records_map.get(primary_address)
-    }
-
-    pub(super) fn get_address_record_mut(
-        &mut self,
+    pub(super) fn get_address_sender(
+        &self,
         primary_address: &Address,
-    ) -> Option<&mut AddressRecord> {
-        self.address_records_map.get_mut(primary_address)
+    ) -> Option<MessageSender<RelayMessage>> {
+        self.shared_state.get_address_sender(primary_address)
     }
 
-    pub(super) fn address_records_map(&self) -> &BTreeMap<Address, AddressRecord> {
-        &self.address_records_map
-    }
+    // pub(super) fn address_records_map(&self) -> &HashMap<Address, AddressRecord> {
+    //     &self.shared_state.address_records_map.read().unwrap()
+    // }
 
     pub(super) fn remove_address_record(
         &mut self,
         primary_address: &Address,
     ) -> Option<AddressRecord> {
         self.flow_controls.cleanup_address(primary_address);
-        self.address_records_map.remove(primary_address)
+        self.shared_state
+            .address_records_map
+            .write()
+            .unwrap()
+            .remove(primary_address)
     }
 
     pub(super) fn insert_address_record(
@@ -86,7 +113,11 @@ impl InternalMap {
         primary_address: Address,
         record: AddressRecord,
     ) -> Option<AddressRecord> {
-        self.address_records_map.insert(primary_address, record)
+        self.shared_state
+            .address_records_map
+            .write()
+            .unwrap()
+            .insert(primary_address, record)
     }
 
     pub(super) fn find_terminal_address(
@@ -114,26 +145,34 @@ impl InternalMap {
     }
 
     pub(super) fn remove_alias(&mut self, alias_address: &Address) -> Option<Address> {
-        self.alias_map.remove(alias_address)
+        self.shared_state
+            .alias_map
+            .write()
+            .unwrap()
+            .remove(alias_address)
     }
 
     pub(super) fn insert_alias(&mut self, alias_address: &Address, primary_address: &Address) {
         _ = self
+            .shared_state
             .alias_map
+            .write()
+            .unwrap()
             .insert(alias_address.clone(), primary_address.clone())
     }
 
-    pub(super) fn get_primary_address(&self, alias_address: &Address) -> Option<&Address> {
-        self.alias_map.get(alias_address)
+    pub(super) fn get_primary_address(&self, alias_address: &Address) -> Option<Address> {
+        self.shared_state.get_primary_address(alias_address)
     }
 }
 
 impl InternalMap {
     #[cfg(feature = "metrics")]
     pub(super) fn update_metrics(&self) {
-        self.metrics
-            .0
-            .store(self.address_records_map.len(), Ordering::Release);
+        self.metrics.0.store(
+            self.shared_state.address_records_map.read().unwrap().len(),
+            Ordering::Release,
+        );
         self.metrics.1.store(self.clusters.len(), Ordering::Release);
     }
 
@@ -149,9 +188,13 @@ impl InternalMap {
 
     /// Add an address to a particular cluster
     pub(super) fn set_cluster(&mut self, label: String, primary: Address) -> NodeReplyResult {
-        let rec = self
+        let address_set = self
+            .shared_state
             .address_records_map
+            .read()
+            .unwrap()
             .get(&primary)
+            .map(|r| r.address_set.clone())
             .ok_or_else(|| NodeError::Address(primary).not_found())?;
 
         // If this is the first time we see this cluster ID
@@ -161,7 +204,7 @@ impl InternalMap {
         }
 
         // Add all addresses to the cluster set
-        for addr in rec.address_set() {
+        for addr in address_set {
             self.clusters
                 .get_mut(&label)
                 .expect("No such cluster??")
@@ -173,16 +216,25 @@ impl InternalMap {
 
     /// Set an address as ready and return the list of waiting pollers
     pub(super) fn set_ready(&mut self, addr: Address) -> Result<Vec<SmallSender<NodeReplyResult>>> {
-        let addr_record = self
+        if let Some(addr_record) = self
+            .shared_state
             .address_records_map
+            .write()
+            .unwrap()
             .get_mut(&addr)
-            .ok_or_else(|| NodeError::Address(addr).not_found())?;
-        Ok(addr_record.set_ready())
+        {
+            Ok(addr_record.set_ready())
+        } else {
+            Err(NodeError::Address(addr).not_found())
+        }
     }
 
     /// Get the ready state of an address
     pub(super) fn get_ready(&mut self, addr: Address, reply: SmallSender<NodeReplyResult>) -> bool {
-        self.address_records_map
+        self.shared_state
+            .address_records_map
+            .write()
+            .unwrap()
             .get_mut(&addr)
             .map_or(false, |rec| rec.ready(reply))
     }
@@ -198,7 +250,10 @@ impl InternalMap {
             let name = self.cluster_order.pop()?;
             let addrs = self.clusters.remove(&name)?;
             let active_addresses: Vec<Address> = self
+                .shared_state
                 .address_records_map
+                .read()
+                .unwrap()
                 .iter()
                 .filter_map(|(primary, _)| {
                     if addrs.contains(primary) {
@@ -226,29 +281,32 @@ impl InternalMap {
         self.stopping.is_empty()
     }
 
-    /// Get all addresses of workers not in a cluster
-    pub(super) fn non_cluster_workers(&mut self) -> Vec<&mut AddressRecord> {
-        let clustered = self
-            .clusters
-            .iter()
-            .fold(BTreeSet::new(), |mut acc, (_, set)| {
-                acc.append(&mut set.clone());
-                acc
-            });
-
-        self.address_records_map
-            .iter_mut()
-            .filter_map(|(addr, rec)| {
-                if clustered.contains(addr) {
-                    None
-                } else {
-                    Some(rec)
-                }
-            })
-            // Filter all detached workers because they don't matter :(
-            .filter(|rec| !rec.meta.detached)
-            .collect()
-    }
+    // /// Get all addresses of workers not in a cluster
+    // pub(super) fn non_cluster_workers(&mut self) -> Vec<&mut AddressRecord> {
+    //     let clustered = self
+    //         .clusters
+    //         .iter()
+    //         .fold(BTreeSet::new(), |mut acc, (_, set)| {
+    //             acc.append(&mut set.clone());
+    //             acc
+    //         });
+    //
+    //     self.shared_state
+    //         .address_records_map
+    //         .write()
+    //         .unwrap()
+    //         .iter_mut()
+    //         .filter_map(|(addr, rec)| {
+    //             if clustered.contains(addr) {
+    //                 None
+    //             } else {
+    //                 Some(rec)
+    //             }
+    //         })
+    //         // Filter all detached workers because they don't matter :(
+    //         .filter(|rec| !rec.meta.detached)
+    //         .collect()
+    // }
 
     /// Permanently free all remaining resources associated to a particular address
     pub(super) fn free_address(&mut self, primary: Address) {
@@ -393,16 +451,25 @@ mod test {
         //   cluster 1 has one active address
         //   cluster 2 has no active address
         //   cluster 3 has one active address
-        map.address_records_map
+        map.shared_state
+            .address_records_map
+            .write()
+            .unwrap()
             .insert("address1".into(), create_address_record("address1"));
         let _ = map.set_cluster("CLUSTER1".into(), "address1".into());
 
-        map.address_records_map
+        map.shared_state
+            .address_records_map
+            .write()
+            .unwrap()
             .insert("address2".into(), create_address_record("address2"));
         let _ = map.set_cluster("CLUSTER2".into(), "address2".into());
         map.free_address("address2".into());
 
-        map.address_records_map
+        map.shared_state
+            .address_records_map
+            .write()
+            .unwrap()
             .insert("address3".into(), create_address_record("address3"));
         let _ = map.set_cluster("CLUSTER3".into(), "address3".into());
 

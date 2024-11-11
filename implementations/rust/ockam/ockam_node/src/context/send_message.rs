@@ -1,7 +1,7 @@
-use crate::channel_types::small_channel;
 use crate::context::MessageWait;
+use crate::error::*;
+use crate::router::utils;
 use crate::{debugger, Context, MessageReceiveOptions, DEFAULT_TIMEOUT};
-use crate::{error::*, NodeMessage};
 use cfg_if::cfg_if;
 use core::time::Duration;
 use ockam_core::compat::{sync::Arc, vec::Vec};
@@ -232,7 +232,6 @@ impl Context {
         }
 
         // First resolve the next hop in the route
-        let (reply_tx, mut reply_rx) = small_channel();
         let addr = match route.next() {
             Ok(next) => next.clone(),
             Err(err) => {
@@ -242,16 +241,7 @@ impl Context {
             }
         };
 
-        let req = NodeMessage::SenderReq(addr, reply_tx);
-        self.sender
-            .send(req)
-            .await
-            .map_err(NodeError::from_send_err)?;
-        let (addr, sender) = reply_rx
-            .recv()
-            .await
-            .ok_or_else(|| NodeError::NodeState(NodeReason::Unknown).internal())??
-            .take_sender()?;
+        let (addr, sender) = utils::resolve(&self.router_map, addr)?;
 
         // Pack the payload into a TransportMessage
         let payload = msg.encode().map_err(|_| NodeError::Data.internal())?;
@@ -337,7 +327,6 @@ impl Context {
         }
 
         // First resolve the next hop in the route
-        let (reply_tx, mut reply_rx) = small_channel();
         let addr = match local_msg.onward_route_ref().next() {
             Ok(next) => next.clone(),
             Err(err) => {
@@ -349,16 +338,8 @@ impl Context {
                 return Err(err);
             }
         };
-        let req = NodeMessage::SenderReq(addr, reply_tx);
-        self.sender
-            .send(req)
-            .await
-            .map_err(NodeError::from_send_err)?;
-        let (addr, sender) = reply_rx
-            .recv()
-            .await
-            .ok_or_else(|| NodeError::NodeState(NodeReason::Unknown).internal())??
-            .take_sender()?;
+
+        let (addr, sender) = utils::resolve(&self.router_map, addr)?;
 
         // Pack the transport message into a RelayMessage wrapper
         let relay_msg = RelayMessage::new(sending_address, addr, local_msg);

@@ -19,6 +19,7 @@ use tokio::runtime::Handle;
 
 use crate::async_drop::AsyncDrop;
 use crate::channel_types::{message_channel, small_channel, SmallReceiver, SmallSender};
+use crate::router::record::InternalMapSharedState;
 use crate::{debugger, Context};
 use crate::{error::*, relay::CtrlSignal, router::SenderPair, NodeMessage};
 
@@ -64,6 +65,7 @@ impl Context {
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
         rt: Handle,
+        router_map: InternalMapSharedState,
         sender: SmallSender<NodeMessage>,
         mailboxes: Mailboxes,
         async_drop_sender: Option<AsyncDropSender>,
@@ -75,6 +77,7 @@ impl Context {
         let (ctrl_tx, ctrl_rx) = small_channel();
         (
             Self {
+                router_map,
                 rt,
                 sender,
                 mailboxes,
@@ -100,6 +103,7 @@ impl Context {
     ) -> (Context, SenderPair, SmallReceiver<CtrlSignal>) {
         Context::new(
             self.runtime().clone(),
+            self.router_map.clone(),
             self.sender().clone(),
             mailboxes,
             None,
@@ -117,6 +121,7 @@ impl Context {
     ) -> (Context, SenderPair, SmallReceiver<CtrlSignal>) {
         Context::new(
             self.runtime().clone(),
+            self.router_map.clone(),
             self.sender().clone(),
             mailboxes,
             Some(drop_sender),

@@ -1,11 +1,11 @@
-mod record;
+pub mod record;
 mod shutdown;
 mod start_processor;
 mod start_worker;
 mod state;
 mod stop_processor;
 mod stop_worker;
-mod utils;
+pub mod utils;
 
 #[cfg(feature = "metrics")]
 use std::sync::atomic::AtomicUsize;
@@ -14,6 +14,7 @@ use record::{AddressRecord, InternalMap, WorkerMeta};
 use state::{NodeState, RouterState};
 
 use crate::channel_types::{router_channel, MessageSender, RouterReceiver, SmallSender};
+use crate::router::record::InternalMapSharedState;
 use crate::{
     error::{NodeError, NodeReason},
     relay::CtrlSignal,
@@ -107,6 +108,10 @@ impl Router {
         self.state.sender.clone()
     }
 
+    pub fn internal_map(&self) -> InternalMapSharedState {
+        self.map.shared_state.clone()
+    }
+
     /// A utility facade to hide failures that are not really failures
     pub async fn run(&mut self) -> Result<()> {
         match self.run_inner().await {
@@ -131,23 +136,32 @@ impl Router {
         addr: &Address,
         reply: &SmallSender<NodeReplyResult>,
     ) -> Result<()> {
-        match self.map.address_records_map().get(addr) {
-            Some(record) => {
-                if record.check() {
-                    let node = NodeError::Address(addr.clone());
-                    reply
-                        .send(Err(node.clone().already_exists()))
-                        .await
-                        .map_err(|_| NodeError::NodeState(NodeReason::Unknown).internal())?;
-
-                    Err(node.already_exists())
-                } else {
-                    self.map.free_address(addr.clone());
-                    Ok(())
-                }
-            }
-            None => Ok(()),
-        }
+        Ok(())
+        // match self
+        //     .map
+        //     .shared_state
+        //     .clone()
+        //     .address_records_map
+        //     .read()
+        //     .unwrap()
+        //     .get(addr)
+        // {
+        //     Some(record) => {
+        //         if record.check() {
+        //             let node = NodeError::Address(addr.clone());
+        //             reply
+        //                 .send(Err(node.clone().already_exists()))
+        //                 .await
+        //                 .map_err(|_| NodeError::NodeState(NodeReason::Unknown).internal())?;
+        //
+        //             Err(node.already_exists())
+        //         } else {
+        //             self.map.free_address(addr.clone());
+        //             Ok(())
+        //         }
+        //     }
+        //     None => Ok(()),
+        // }
     }
 
     async fn handle_msg(&mut self, msg: NodeMessage) -> Result<bool> {
@@ -213,7 +227,6 @@ impl Router {
                 addresses_metadata,
             } => start_processor::exec(self, addrs, senders, addresses_metadata, reply).await?,
             StopProcessor(ref addr, ref reply) => stop_processor::exec(self, addr, reply).await?,
-
             //// ==! Core node controls
             StopNode(ShutdownType::Graceful(timeout), reply) => {
                 // This sets state to stopping, and the sends the AbortNode message
@@ -262,19 +275,35 @@ impl Router {
                 }
             }
 
-            ListWorkers(sender) => sender
-                .send(RouterReply::workers(
-                    self.map.address_records_map().keys().cloned().collect(),
-                ))
-                .await
-                .map_err(|_| NodeError::NodeState(NodeReason::Unknown).internal())?,
+            ListWorkers(sender) => {
+                let res = self
+                    .map
+                    .shared_state
+                    .address_records_map
+                    .read()
+                    .unwrap()
+                    .keys()
+                    .cloned()
+                    .collect();
+                sender
+                    .send(RouterReply::workers(res))
+                    .await
+                    .map_err(|_| NodeError::NodeState(NodeReason::Unknown).internal())?
+            }
 
-            IsWorkerRegisteredAt(sender, address) => sender
-                .send(RouterReply::worker_is_registered_at_address(
-                    self.map.address_records_map().contains_key(&address),
-                ))
-                .await
-                .map_err(|_| NodeError::NodeState(NodeReason::Unknown).internal())?,
+            IsWorkerRegisteredAt(sender, address) => {
+                let res = self
+                    .map
+                    .shared_state
+                    .address_records_map
+                    .read()
+                    .unwrap()
+                    .contains_key(&address);
+                sender
+                    .send(RouterReply::worker_is_registered_at_address(res))
+                    .await
+                    .map_err(|_| NodeError::NodeState(NodeReason::Unknown).internal())?
+            }
 
             SetCluster(addr, label, reply) => {
                 debug!("Setting cluster on address {}", addr);
@@ -309,15 +338,6 @@ impl Router {
                 }
             }
 
-            // Handle route/ sender requests
-            SenderReq(addr, ref reply) => match determine_type(&addr) {
-                RouteType::Internal => utils::resolve(self, addr, reply).await?,
-                // TODO: Remove after other transport implementations are moved to new architecture
-                RouteType::External(tt) => {
-                    let addr = utils::router_addr(self, tt)?;
-                    utils::resolve(self, addr, reply).await?
-                }
-            },
             FindTerminalAddress(ref addresses, ref reply) => {
                 let terminal_address = self.map.find_terminal_address(addresses);
                 reply
