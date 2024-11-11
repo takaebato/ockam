@@ -5,7 +5,7 @@ use ockam_core::{Address, Processor, Result};
 use ockam_node::Context;
 use ockam_transport_core::TransportError;
 use tokio::net::TcpListener;
-use tracing::{debug, instrument};
+use tracing::debug;
 
 /// A TCP Listen processor
 ///
@@ -101,7 +101,7 @@ impl Processor for TcpListenProcessor {
             mode,
             &receiver_flow_control_id,
         )
-            .await?;
+        .await?;
 
         // Processor to receive messages over the wire and forward them to the node
         TcpRecvProcessor::start(
@@ -114,7 +114,7 @@ impl Processor for TcpListenProcessor {
             &receiver_flow_control_id,
             receiver_outgoing_access_control,
         )
-            .await?;
+        .await?;
 
         Ok(true)
     }

@@ -160,19 +160,6 @@ impl CliState {
         }
     }
 
-    pub(super) fn user_journey_repository(&self) -> Arc<dyn JourneysRepository> {
-        let database = self.database();
-        match database.configuration {
-            DatabaseConfiguration::SqlitePersistent { .. }
-            | DatabaseConfiguration::SqliteInMemory { .. } => Arc::new(AutoRetry::new(
-                JourneysSqlxDatabase::new(self.application_database()),
-            )),
-            DatabaseConfiguration::Postgres { .. } => {
-                Arc::new(JourneysSqlxDatabase::new(self.application_database()))
-            }
-        }
-    }
-
     pub fn cached_credentials_repository(&self, node_name: &str) -> Arc<dyn CredentialRepository> {
         let database = self.database();
         match database.configuration {

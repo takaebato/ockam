@@ -1,8 +1,5 @@
 use crate::state::{AppState, NODE_NAME};
-use ockam_api::logs::{
-    logging_configuration, Colored, ExportingConfiguration, LogLevelWithCratesFilter,
-    LoggingTracing,
-};
+use ockam_api::logs::{logging_configuration, Colored, LogLevelWithCratesFilter, LoggingTracing};
 
 impl AppState {
     /// Setup logging and tracing for the Portals application
@@ -24,9 +21,6 @@ impl AppState {
             .add_crates(vec!["ockam_app_lib"]);
         let tracing_guard = LoggingTracing::setup(
             &logging_configuration(level_and_crates, Some(node_dir), Colored::Off).unwrap(),
-            &ExportingConfiguration::foreground().unwrap(),
-            "portals",
-            Some("portals".to_string()),
         );
         self.tracing_guard
             .set(tracing_guard)

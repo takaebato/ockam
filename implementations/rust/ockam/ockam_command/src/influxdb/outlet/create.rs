@@ -89,9 +89,6 @@ impl Command for InfluxDBCreateCommand {
             )
             .await?
         };
-        self.tcp_outlet
-            .add_outlet_created_journey_event(&opts, &node.node_name(), &outlet_status)
-            .await?;
 
         opts.terminal
             .stdout()

@@ -130,7 +130,7 @@ impl CliState {
             scope: CredentialScope::ProjectMember {
                 project_id: project_id.clone(),
             }
-                .to_string(),
+            .to_string(),
         };
 
         let controller_identifier = NodeManager::load_controller_identifier()?;
@@ -145,7 +145,7 @@ impl CliState {
             scope: CredentialScope::ProjectAdmin {
                 project_id: project_id.clone(),
             }
-                .to_string(),
+            .to_string(),
         };
 
         let account_admin_retriever = NodeManagerCredentialRetrieverOptions::Remote {
@@ -158,7 +158,7 @@ impl CliState {
                 //  yet anywhere
                 account_id: project_id.clone(),
             }
-                .to_string(),
+            .to_string(),
         };
 
         let trust_options = NodeManagerTrustOptions::new(

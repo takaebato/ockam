@@ -4,7 +4,6 @@ use crate::{Command, CommandGlobalOpts};
 use async_trait::async_trait;
 use clap::Args;
 use ockam_node::Context;
-use tracing::instrument;
 
 /// Start a Rendezvous server in foreground
 #[derive(Clone, Debug, Args)]

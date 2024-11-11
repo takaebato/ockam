@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::process;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -12,7 +11,7 @@ use r3bl_tui::{
 };
 use tokio::sync::Mutex;
 use tokio::try_join;
-use tracing::{error, info, instrument, warn};
+use tracing::{error, info, warn};
 
 use crate::enroll::OidcServiceExt;
 use crate::error::Error;
@@ -21,7 +20,6 @@ use crate::project::util::check_project_readiness;
 use crate::util::async_cmd;
 use crate::{docs, CommandGlobalOpts, Result};
 use ockam::Context;
-use ockam_api::cli_state::journeys::{JourneyEvent, USER_EMAIL, USER_NAME};
 use ockam_api::cli_state::random_name;
 use ockam_api::cloud::enroll::auth0::*;
 use ockam_api::cloud::project::Project;
@@ -99,13 +97,6 @@ impl EnrollCommand {
     }
 
     // Creates one span in the trace
-    skip_all, // Drop all args that passed in, as Context doesn't play nice
-    fields(
-    enroller = ? self .identity, // https://docs.rs/tracing/latest/tracing/
-    authorization_code_flow = % self .authorization_code_flow,
-    force = % self .force,
-    skip_orchestrator_resources_creation = % self .skip_orchestrator_resources_creation,
-    ))]
     async fn run_impl(&self, ctx: &Context, opts: CommandGlobalOpts) -> miette::Result<()> {
         ctrlc_handler(opts.clone());
 
@@ -128,7 +119,7 @@ impl EnrollCommand {
         let node = InMemoryNode::start_with_identity(ctx, &opts.state, Some(identity_name.clone()))
             .await?;
 
-        let user_info = self.enroll_identity(ctx, &opts, &node).await?;
+        let _user_info = self.enroll_identity(ctx, &opts, &node).await?;
 
         if let Err(error) = retrieve_user_space_and_project(
             &opts,
@@ -136,7 +127,7 @@ impl EnrollCommand {
             &node,
             self.skip_orchestrator_resources_creation,
         )
-            .await
+        .await
         {
             // Display output to user
             opts.terminal
@@ -163,19 +154,6 @@ impl EnrollCommand {
                 color_primary("ockam enroll")
             )));
         }
-
-        // Tracing
-        let mut attributes = HashMap::new();
-        attributes.insert(USER_NAME, user_info.name.clone());
-        attributes.insert(USER_EMAIL, user_info.email.to_string());
-        // this event formally only happens on the host journey
-        // but we add it here for better rendering of the project journey
-        opts.state
-            .add_journey_event(JourneyEvent::ok("enroll".to_string()), attributes.clone())
-            .await?;
-        opts.state
-            .add_journey_event(JourneyEvent::Enrolled, attributes)
-            .await?;
 
         // Output
         opts.terminal
@@ -301,18 +279,18 @@ fn display_header(opts: &CommandGlobalOpts) {
             OckamColor::OckamBlue.value(),
             OckamColor::HeaderGradient.value(),
         ]
-            .map(String::from),
+        .map(String::from),
     );
     let colored_header = ColorWheel::new(vec![ColorWheelConfig::Rgb(
         gradient_steps,
         ColorWheelSpeed::Medium,
         50,
     )])
-        .colorize_into_string(
-            &UnicodeString::from(ockam_header),
-            GradientGenerationPolicy::ReuseExistingGradientAndResetIndex,
-            TextColorizationPolicy::ColorEachCharacter(None),
-        );
+    .colorize_into_string(
+        &UnicodeString::from(ockam_header),
+        GradientGenerationPolicy::ReuseExistingGradientAndResetIndex,
+        TextColorizationPolicy::ColorEachCharacter(None),
+    );
 
     let _ = opts.terminal.write_line(format!("{}\n", colored_header));
 }
@@ -356,12 +334,12 @@ async fn retrieve_user_space_and_project(
         skip_orchestrator_resources_creation,
         &space,
     )
-        .await
-        .wrap_err(format!(
-            "Unable to retrieve and set a Project as default with Space {}",
-            color_primary(&space.name)
-        ))?
-        .ok_or(miette!("No Project was found"))?;
+    .await
+    .wrap_err(format!(
+        "Unable to retrieve and set a Project as default with Space {}",
+        color_primary(&space.name)
+    ))?
+    .ok_or(miette!("No Project was found"))?;
     opts.terminal.write_line(fmt_separator!())?;
     Ok(project)
 }

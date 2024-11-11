@@ -2,16 +2,12 @@ use crate::portal::addresses::Addresses;
 use crate::portal::portal_message::MAX_PAYLOAD_SIZE;
 use crate::{PortalInternalMessage, PortalMessage, TcpRegistry};
 use ockam_core::compat::vec::Vec;
-use ockam_core::{
-    async_trait, Encodable, LocalMessage, OpenTelemetryContext, Route, OCKAM_TRACER_NAME,
-};
+use ockam_core::{async_trait, Encodable, LocalMessage, Route};
 use ockam_core::{route, Processor, Result};
 use ockam_node::Context;
-use opentelemetry::global;
-use opentelemetry::trace::Tracer;
 use tokio::io::AsyncRead;
 use tokio::io::AsyncReadExt;
-use tracing::{error, instrument, warn};
+use tracing::{error, warn};
 
 /// A TCP Portal receiving message processor
 ///
@@ -74,14 +70,8 @@ impl<R: AsyncRead + Unpin + Send + Sync + 'static> Processor for TcpPortalRecvPr
             }
         };
 
-        let tracer = global::tracer(OCKAM_TRACER_NAME);
-        let tracing_context = tracer.in_span("TcpPortalRecvProcessor::forward_message", |cx| {
-            OpenTelemetryContext::inject(&cx)
-        });
-
         if self.buf.is_empty() {
             // Notify Sender that connection was closed
-            ctx.set_tracing_context(tracing_context.clone());
             if let Err(err) = ctx
                 .send_from_address(
                     route![self.addresses.sender_internal.clone()],
@@ -98,13 +88,12 @@ impl<R: AsyncRead + Unpin + Send + Sync + 'static> Processor for TcpPortalRecvPr
 
             ctx.forward_from_address(
                 LocalMessage::new()
-                    .with_tracing_context(tracing_context.clone())
                     .with_onward_route(self.onward_route.clone())
                     .with_return_route(route![self.addresses.sender_remote.clone()])
                     .with_payload(PortalMessage::Disconnect.encode()?),
                 self.addresses.receiver_remote.clone(),
             )
-                .await?;
+            .await?;
 
             return Ok(false);
         }
@@ -112,7 +101,6 @@ impl<R: AsyncRead + Unpin + Send + Sync + 'static> Processor for TcpPortalRecvPr
         // Loop just in case buf was extended (should not happen though)
         for chunk in self.buf.chunks(MAX_PAYLOAD_SIZE) {
             let msg = LocalMessage::new()
-                .with_tracing_context(tracing_context.clone())
                 .with_onward_route(self.onward_route.clone())
                 .with_return_route(route![self.addresses.sender_remote.clone()])
                 .with_payload(

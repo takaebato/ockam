@@ -5,7 +5,7 @@ use ockam_core::{
 };
 use ockam_node::{Context, WorkerBuilder};
 use ockam_transport_core::{HostnamePort, TransportError};
-use tracing::{debug, instrument};
+use tracing::debug;
 
 /// A TCP Portal Outlet listen worker
 ///
@@ -100,7 +100,7 @@ impl Worker for TcpOutletListenWorker {
             self.options.incoming_access_control.clone(),
             self.options.outgoing_access_control.clone(),
         )
-            .await?;
+        .await?;
 
         debug!("Created Tcp Outlet at {}", addresses.sender_remote);
 

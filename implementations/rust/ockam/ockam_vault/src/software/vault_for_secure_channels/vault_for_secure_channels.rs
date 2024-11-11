@@ -1,7 +1,5 @@
 use sha2::{Digest, Sha256};
-use tracing::instrument;
 
-use ockam_core::compat::boxed::Box;
 use ockam_core::compat::collections::BTreeMap;
 use ockam_core::compat::rand::{thread_rng, RngCore};
 use ockam_core::compat::sync::{Arc, RwLock};

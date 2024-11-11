@@ -4,14 +4,12 @@ use colorful::Colorful;
 use miette::IntoDiagnostic;
 use ockam::identity::models::ChangeHistory;
 use ockam::identity::IdentitiesVerification;
-use ockam_api::cli_state::journeys::{JourneyEvent, IDENTIFIER, IDENTITY_NAME};
 use ockam_api::cli_state::{random_name, NamedVault};
 use ockam_api::colors::{color_primary, OckamColor};
 use ockam_api::terminal::notification::NotificationHandler;
 use ockam_api::{fmt_log, fmt_ok};
 use ockam_node::Context;
 use ockam_vault::SoftwareVaultForVerifyingSignatures;
-use std::collections::HashMap;
 
 use crate::{docs, Command, CommandGlobalOpts};
 
@@ -75,12 +73,6 @@ impl CreateCommand {
             }
         };
         let identifier = identity.identifier().to_string();
-        let mut attributes = HashMap::new();
-        attributes.insert(IDENTIFIER, identifier.clone());
-        attributes.insert(IDENTITY_NAME, self.name.clone());
-        opts.state
-            .add_journey_event(JourneyEvent::IdentityCreated, attributes)
-            .await?;
 
         opts.terminal
             .stdout()
@@ -121,13 +113,6 @@ impl CreateCommand {
         .into_diagnostic()?;
         opts.state
             .store_named_identity(&identifier, &self.name, &vault.name())
-            .await?;
-
-        let mut attributes = HashMap::new();
-        attributes.insert(IDENTIFIER, identifier.to_string());
-        attributes.insert(IDENTITY_NAME, self.name.clone());
-        opts.state
-            .add_journey_event(JourneyEvent::IdentityCreated, attributes)
             .await?;
 
         opts.terminal

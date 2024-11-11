@@ -8,7 +8,7 @@ use console::Term;
 use miette::{miette, IntoDiagnostic};
 use reqwest::StatusCode;
 use tokio::time::{sleep, Duration};
-use tracing::{debug, instrument};
+use tracing::debug;
 
 use ockam_api::cloud::enroll::auth0::*;
 use ockam_api::colors::{color_email, color_uri, OckamColor};

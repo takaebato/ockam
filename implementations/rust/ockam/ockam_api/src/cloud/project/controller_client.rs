@@ -258,6 +258,6 @@ impl ControllerClient {
                 ))
             }
         })
-            .await
+        .await
     }
 }

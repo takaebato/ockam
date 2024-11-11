@@ -4,7 +4,6 @@ use ockam_node::Context;
 use ockam_transport_core::Transport;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use tracing::instrument;
 
 use crate::{TcpConnectionOptions, TcpListenerInfo, TcpRegistry, TcpSenderInfo, TcpTransport, TCP};
 

@@ -1,8 +1,7 @@
-use crate::cli_state::journeys::{Journey, ProjectJourney};
 use crate::cli_state::{
-    EnrollmentsRepository, IdentitiesRepository, IdentityEnrollment, JourneysRepository,
-    NamedIdentity, NamedVault, NodeInfo, NodesRepository, ProjectsRepository, SpacesRepository,
-    TcpInlet, TcpPortalsRepository, UsersRepository, VaultType, VaultsRepository,
+    EnrollmentsRepository, IdentitiesRepository, IdentityEnrollment, NamedIdentity, NamedVault,
+    NodeInfo, NodesRepository, ProjectsRepository, SpacesRepository, TcpInlet,
+    TcpPortalsRepository, UsersRepository, VaultType, VaultsRepository,
 };
 use crate::cloud::email_address::EmailAddress;
 use crate::cloud::enroll::auth0::UserInfo;
@@ -10,7 +9,6 @@ use crate::cloud::project::models::ProjectModel;
 use crate::cloud::space::Space;
 use crate::config::lookup::InternetAddress;
 use crate::nodes::models::portal::OutletStatus;
-use chrono::{DateTime, Utc};
 use ockam::identity::models::{ChangeHistory, CredentialAndPurposeKey, PurposeKeyAttestation};
 use ockam::identity::storage::PurposeKeysRepository;
 use ockam::identity::{
@@ -153,36 +151,6 @@ impl<T: IdentitiesRepository + Send + Sync + 'static> IdentitiesRepository for A
 
     async fn get_default_named_identity(&self) -> ockam_core::Result<Option<NamedIdentity>> {
         retry!(self.wrapped.get_default_named_identity())
-    }
-}
-
-#[async_trait]
-impl<T: JourneysRepository> JourneysRepository for AutoRetry<T> {
-    async fn store_project_journey(
-        &self,
-        project_journey: ProjectJourney,
-    ) -> ockam_core::Result<()> {
-        retry!(self.wrapped.store_project_journey(project_journey.clone()))
-    }
-
-    async fn get_project_journey(
-        &self,
-        project_id: &str,
-        now: DateTime<Utc>,
-    ) -> ockam_core::Result<Option<ProjectJourney>> {
-        retry!(self.wrapped.get_project_journey(project_id, now))
-    }
-
-    async fn delete_project_journeys(&self, project_id: &str) -> ockam_core::Result<()> {
-        retry!(self.wrapped.delete_project_journeys(project_id))
-    }
-
-    async fn store_host_journey(&self, host_journey: Journey) -> ockam_core::Result<()> {
-        retry!(self.wrapped.store_host_journey(host_journey.clone()))
-    }
-
-    async fn get_host_journey(&self, now: DateTime<Utc>) -> ockam_core::Result<Option<Journey>> {
-        retry!(self.wrapped.get_host_journey(now))
     }
 }
 

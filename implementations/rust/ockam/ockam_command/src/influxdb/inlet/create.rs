@@ -107,9 +107,6 @@ impl Command for InfluxDBCreateCommand {
         };
 
         let node_name = node.node_name();
-        self.tcp_inlet
-            .add_inlet_created_event(&opts, &node_name, &inlet_status)
-            .await?;
 
         let created_message = fmt_ok!(
             "Created a new InfluxDB Inlet in the Node {} bound to {}\n",

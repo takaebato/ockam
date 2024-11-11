@@ -207,7 +207,7 @@ impl CliState {
                     change_history,
                     identity_vault.verifying_vault,
                 )
-                    .await?)
+                .await?)
             }
             None => Err(Self::missing_identifier(name))?,
         }

@@ -60,7 +60,7 @@ impl EnrollmentTokenIssuer {
             enroller,
             &self.account_authority,
         )
-            .await?;
+        .await?;
 
         if !check.is_enroller {
             warn!(

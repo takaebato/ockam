@@ -2,7 +2,6 @@ use crate::utils::now;
 use crate::{AttributesEntry, Identifier, IdentityAttributesRepository};
 use ockam_core::compat::sync::Arc;
 use ockam_core::Result;
-use tracing_attributes::instrument;
 
 /// This struct provides access to the identities attributes stored on a node.
 ///

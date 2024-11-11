@@ -3,7 +3,6 @@ use ockam_core::{async_trait, Address, AsyncTryClone, Error, Result, TransportTy
 use ockam_node::Context;
 use ockam_transport_core::Transport;
 use std::sync::Arc;
-use tracing::instrument;
 
 use crate::UdpBindArguments;
 use crate::{UdpBindOptions, UdpTransport, UDP};

@@ -4,14 +4,10 @@ use clap::Parser;
 use miette::IntoDiagnostic;
 
 use crate::{
-    add_command_error_event, has_help_flag, has_version_flag, pager, replace_hyphen_with_stdin,
-    util::exitcode, version::Version, OckamCommand,
+    has_help_flag, has_version_flag, pager, replace_hyphen_with_stdin, util::exitcode,
+    version::Version, OckamCommand,
 };
-use ockam_api::cli_state::CliState;
-use ockam_api::logs::{
-    logging_configuration, Colored, ExportingConfiguration, LogLevelWithCratesFilter,
-    LoggingTracing,
-};
+use ockam_api::logs::{logging_configuration, Colored, LogLevelWithCratesFilter, LoggingTracing};
 use ockam_api::output::Output;
 
 /// Main method for running the `ockam` executable:
@@ -32,7 +28,7 @@ pub fn run() -> miette::Result<()> {
         Err(help) => {
             // the -h or --help flag must not be interpreted as an error
             if !has_help_flag(&input) {
-                let command = input
+                input
                     .iter()
                     .take_while(|a| !a.starts_with('-'))
                     .collect::<Vec<_>>()
@@ -44,16 +40,7 @@ pub fn run() -> miette::Result<()> {
                 let level_and_crates = LogLevelWithCratesFilter::new().into_diagnostic()?;
                 let logging_configuration =
                     logging_configuration(level_and_crates, None, Colored::On);
-                let _guard = LoggingTracing::setup(
-                    &logging_configuration.into_diagnostic()?,
-                    &ExportingConfiguration::foreground().into_diagnostic()?,
-                    "local node",
-                    None,
-                );
-
-                let cli_state = CliState::with_default_dir()?;
-                let message = format!("could not parse the command: {}", command);
-                add_command_error_event(cli_state, &command, &message, input.join(" "))?;
+                let _guard = LoggingTracing::setup(&logging_configuration.into_diagnostic()?);
             };
             pager::render_help(help);
         }

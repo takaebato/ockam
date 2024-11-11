@@ -46,10 +46,10 @@ impl Space {
     pub fn is_in_free_trial_subscription(&self) -> bool {
         self.subscription.is_none()
             || self
-            .subscription
-            .as_ref()
-            .map(|s| s.is_free_trial)
-            .unwrap_or_default()
+                .subscription
+                .as_ref()
+                .map(|s| s.is_free_trial)
+                .unwrap_or_default()
     }
 
     pub fn subscription_status_message(&self, space_is_new: bool) -> crate::Result<String> {

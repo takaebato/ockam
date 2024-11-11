@@ -7,14 +7,13 @@ use crate::value_parsers::{parse_config_or_path_or_url, parse_key_val};
 use crate::CommandGlobalOpts;
 use clap::Args;
 use miette::{miette, IntoDiagnostic};
-use ockam_api::cli_state::journeys::APPLICATION_EVENT_COMMAND_CONFIGURATION_FILE;
 use ockam_api::cli_state::random_name;
 use ockam_api::nodes::BackgroundNodeClient;
-use ockam_core::{AsyncTryClone, OpenTelemetryContext};
+use ockam_core::AsyncTryClone;
 use ockam_node::Context;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
-use tracing::{debug, instrument, Span};
+use tracing::debug;
 
 pub const ENROLLMENT_TICKET: &str = "ENROLLMENT_TICKET";
 
@@ -100,11 +99,6 @@ impl CreateCommand {
         }
         // Parse the configuration
         let node_config = NodeConfig::parse(contents.clone())?;
-        // Record the configuration contents if the node configuration was successfully parsed
-        Span::current().record(
-            APPLICATION_EVENT_COMMAND_CONFIGURATION_FILE.as_str(),
-            contents.to_string(),
-        );
         Ok(node_config)
     }
 }
@@ -156,13 +150,6 @@ impl NodeConfig {
         if self.node.name.is_none() {
             self.node.name = Some(random_name().into());
         }
-        if self.node.opentelemetry_context.is_none() {
-            self.node.opentelemetry_context = Some(
-                serde_json::to_string(&OpenTelemetryContext::current())
-                    .into_diagnostic()?
-                    .into(),
-            );
-        }
 
         // Override config values with passed command args
         let default_cmd_args = CreateCommand::default();
@@ -205,10 +192,6 @@ impl NodeConfig {
                     .into_diagnostic()?
                     .into(),
             );
-        }
-        if let Some(context) = &cmd.opentelemetry_context {
-            self.node.opentelemetry_context =
-                Some(serde_json::to_string(&context).into_diagnostic()?.into());
         }
         if cmd.udp != default_cmd_args.udp {
             self.node.udp = Some(cmd.udp.into());
@@ -280,7 +263,7 @@ impl NodeConfig {
             // This prevents the current process from handling the signal and, for example,
             // add a newline to the terminal before the child process has finished writing its output.
         })
-            .expect("Error setting exit signal handler");
+        .expect("Error setting exit signal handler");
 
         // Run the other sections
         let node_name = Some(node_name);
@@ -491,7 +474,7 @@ mod tests {
             name: n1
             tcp-listener-address: 127.0.0.1:5555
         "#
-            .to_string();
+        .to_string();
         let mut config = NodeConfig::parse(contents).unwrap();
         config.merge(&cli_args).unwrap();
         let node = config.node.into_parsed_commands().unwrap().pop().unwrap();

@@ -96,7 +96,7 @@ impl InMemoryNode {
             None,
             None,
         )
-            .await
+        .await
     }
 
     /// Start an in memory node with some identity and project
@@ -168,8 +168,8 @@ impl InMemoryNode {
             NodeManagerTransportOptions::new(tcp_listener.flow_control_id().clone(), tcp, None),
             trust_options,
         )
-            .await
-            .into_diagnostic()?;
+        .await
+        .into_diagnostic()?;
         ctx.flow_controls()
             .add_consumer(NODEMANAGER_ADDR, tcp_listener.flow_control_id());
         Ok(node_manager)

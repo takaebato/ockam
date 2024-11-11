@@ -62,7 +62,6 @@ pub async fn spawn_node(opts: &CommandGlobalOpts, cmd: CreateCommand) -> miette:
         udp,
         launch_configuration,
         trust_opts,
-        opentelemetry_context,
         ..
     } = cmd;
     let TrustOpts {
@@ -121,11 +120,6 @@ pub async fn spawn_node(opts: &CommandGlobalOpts, cmd: CreateCommand) -> miette:
     if let Some(authority_route) = authority_route {
         args.push("--authority-route".to_string());
         args.push(authority_route.to_string());
-    }
-
-    if let Some(opentelemetry_context) = opentelemetry_context {
-        args.push("--opentelemetry-context".to_string());
-        args.push(opentelemetry_context.to_string());
     }
 
     if http_server {

@@ -106,7 +106,7 @@ impl Operations for ControllerClient {
                 ))
             }
         })
-            .await?;
+        .await?;
 
         if operation.is_successful() {
             Ok(())

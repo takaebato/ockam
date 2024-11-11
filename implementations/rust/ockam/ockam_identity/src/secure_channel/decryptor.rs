@@ -20,7 +20,6 @@ use crate::{
 use crate::secure_channel::encryptor_worker::SecureChannelSharedState;
 use ockam_vault::{AeadSecretKeyHandle, VaultForSecureChannels};
 use tracing::{debug, info, trace, warn};
-use tracing_attributes::instrument;
 
 pub(crate) struct DecryptorHandler {
     //for debug purposes only
@@ -171,7 +170,7 @@ impl DecryptorHandler {
             msg.credentials,
             None,
         )
-            .await?;
+        .await?;
 
         info!(
             "Successfully handled credentials refresh for {}",

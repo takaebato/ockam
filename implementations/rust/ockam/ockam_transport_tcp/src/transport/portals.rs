@@ -9,7 +9,6 @@ use ockam_core::{route, Address, Result, Route};
 use ockam_node::compat::asynchronous::RwLock;
 use ockam_node::Context;
 use ockam_transport_core::{parse_socket_addr, HostnamePort};
-use tracing::instrument;
 
 impl TcpTransport {
     /// Create Tcp Inlet that listens on bind_addr, transforms Tcp stream into Ockam Routable
@@ -43,7 +42,7 @@ impl TcpTransport {
             socket_address,
             options,
         )
-            .await
+        .await
     }
 
     /// Stop inlet at addr
@@ -98,7 +97,7 @@ impl TcpTransport {
             peer,
             options,
         )
-            .await?;
+        .await?;
 
         Ok(())
     }

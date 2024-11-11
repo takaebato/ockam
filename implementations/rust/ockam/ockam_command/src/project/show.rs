@@ -1,7 +1,6 @@
 use async_trait::async_trait;
 use clap::Args;
 use miette::IntoDiagnostic;
-use tracing::instrument;
 
 use ockam::Context;
 use ockam_api::cloud::project::ProjectsOrchestratorApi;
@@ -52,7 +51,7 @@ impl Command for ShowCommand {
             opts,
             self.name.clone(),
         )
-            .await?)
+        .await?)
     }
 }
 

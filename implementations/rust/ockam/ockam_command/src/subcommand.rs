@@ -12,7 +12,6 @@ use tokio_retry::strategy::jitter;
 use tracing::warn;
 
 use ockam_api::{fmt_log, fmt_warn, CliState};
-use ockam_core::OpenTelemetryContext;
 use ockam_node::Context;
 
 use crate::admin::AdminCommand;
@@ -186,18 +185,6 @@ impl OckamSubcommand {
 
             OckamSubcommand::FlowControl(c) => c.run(opts),
             OckamSubcommand::Sidecar(c) => c.run(opts),
-        }
-    }
-
-    /// Return the opentelemetry context if the command can be executed as the continuation
-    /// of an existing trace
-    pub fn get_opentelemetry_context(&self) -> Option<OpenTelemetryContext> {
-        match self {
-            OckamSubcommand::Node(cmd) => match &cmd.subcommand {
-                NodeSubcommand::Create(cmd) => cmd.opentelemetry_context.clone(),
-                _ => None,
-            },
-            _ => None,
         }
     }
 

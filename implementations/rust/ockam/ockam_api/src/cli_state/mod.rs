@@ -12,7 +12,6 @@ pub mod enrollments;
 pub mod error;
 pub mod identities;
 mod identities_attributes;
-pub mod journeys;
 pub mod nodes;
 pub mod policies;
 pub mod projects;

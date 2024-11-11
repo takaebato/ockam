@@ -130,7 +130,7 @@ impl NodeManager {
                     Action::HandleMessage,
                     expression,
                 )
-                    .await?
+                .await?
             }
         };
 

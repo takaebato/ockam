@@ -288,9 +288,9 @@ impl CliState {
             VaultType::DatabaseVault { .. } => self.database(),
             VaultType::LocalFileVault { ref path, .. } =>
             // TODO: Avoid creating multiple dbs with the same file
-                {
-                    SqlxDatabase::create_sqlite(path.as_path()).await?
-                }
+            {
+                SqlxDatabase::create_sqlite(path.as_path()).await?
+            }
         };
 
         if named_vault.vault_type.use_aws_kms() {
@@ -419,7 +419,7 @@ impl Display for VaultType {
             }
         )?;
         if self.use_aws_kms() {
-            writeln!(f, "Uses AWS KMS: true", )?;
+            writeln!(f, "Uses AWS KMS: true",)?;
         }
         Ok(())
     }
@@ -535,7 +535,7 @@ impl Output for NamedVault {
             }
         )?;
         if self.vault_type.use_aws_kms() {
-            writeln!(output, "Uses AWS KMS: true", )?;
+            writeln!(output, "Uses AWS KMS: true",)?;
         }
         Ok(output)
     }

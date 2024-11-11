@@ -2,8 +2,6 @@ use crate::tokio::runtime::Runtime;
 use crate::{debugger, Context, Executor};
 use ockam_core::compat::sync::Arc;
 use ockam_core::flow_control::FlowControls;
-#[cfg(feature = "std")]
-use ockam_core::OpenTelemetryContext;
 use ockam_core::{Address, AllowAll, Mailbox, Mailboxes};
 
 /// A minimal worker implementation that does nothing
@@ -137,8 +135,6 @@ impl NodeBuilder {
             None,
             Default::default(),
             &flow_controls,
-            #[cfg(feature = "std")]
-            OpenTelemetryContext::current(),
         );
 
         debugger::log_inherit_context("NODE", &ctx, &ctx);

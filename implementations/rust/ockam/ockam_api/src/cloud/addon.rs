@@ -135,7 +135,7 @@ impl Addons for ControllerClient {
         let req = Request::post(format!(
             "/v1/projects/{project_id}/configure_addon/confluent"
         ))
-            .body(config);
+        .body(config);
         self.get_secure_client()
             .ask(ctx, API_SERVICE, req)
             .await
@@ -170,7 +170,7 @@ impl Addons for ControllerClient {
         let req = Request::post(format!(
             "/v1/projects/{project_id}/configure_addon/influxdb_token_lease_manager"
         ))
-            .body(config);
+        .body(config);
         self.get_secure_client()
             .ask(ctx, API_SERVICE, req)
             .await

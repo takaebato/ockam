@@ -2,7 +2,6 @@ use crate::channel_types::small_channel;
 use crate::context::MessageWait;
 use crate::{debugger, Context, MessageReceiveOptions, DEFAULT_TIMEOUT};
 use crate::{error::*, NodeMessage};
-use cfg_if::cfg_if;
 use core::time::Duration;
 use ockam_core::compat::{sync::Arc, vec::Vec};
 use ockam_core::{
@@ -105,9 +104,6 @@ impl Context {
         }
 
         let mut child_ctx = self.new_detached_with_mailboxes(mailboxes).await?;
-
-        #[cfg(feature = "std")]
-        child_ctx.set_tracing_context(self.tracing_context());
 
         child_ctx.send(route, msg).await?;
         child_ctx
@@ -257,23 +253,11 @@ impl Context {
         let payload = msg.encode().map_err(|_| NodeError::Data.internal())?;
 
         // Pack transport message into a LocalMessage wrapper
-        cfg_if! {
-            if #[cfg(feature = "std")] {
-                let local_msg = LocalMessage::new()
-                    // make sure to set the latest tracing context, to get the latest span id
-                    .with_tracing_context(self.tracing_context().update())
-                    .with_onward_route(route)
-                    .with_return_route(route![sending_address.clone()])
-                    .with_payload(payload)
-                    .with_local_info(local_info);
-            } else {
-                let local_msg = LocalMessage::new()
-                    .with_onward_route(route)
-                    .with_return_route(route![sending_address.clone()])
-                    .with_payload(payload)
-                    .with_local_info(local_info);
-            }
-        }
+        let local_msg = LocalMessage::new()
+            .with_onward_route(route)
+            .with_return_route(route![sending_address.clone()])
+            .with_payload(payload)
+            .with_local_info(local_info);
 
         // Pack local message into a RelayMessage wrapper
         let relay_msg = RelayMessage::new(sending_address.clone(), addr, local_msg);

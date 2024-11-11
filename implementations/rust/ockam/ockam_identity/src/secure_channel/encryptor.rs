@@ -3,7 +3,6 @@ use ockam_core::compat::vec::Vec;
 use ockam_core::errcode::{Kind, Origin};
 use ockam_core::{Error, Result};
 use ockam_vault::{AeadSecretKeyHandle, VaultForSecureChannels};
-use tracing_attributes::instrument;
 
 use crate::{Nonce, MAX_NONCE};
 
@@ -97,7 +96,7 @@ impl Encryptor {
                 Kind::Internal,
                 format!(
                     "the key id {} could not be deleted in the Encryptor shutdown",
-                    hex::encode(self.key.0.0.value())
+                    hex::encode(self.key.0 .0.value())
                 ),
             ))
         } else {

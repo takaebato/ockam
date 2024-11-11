@@ -12,7 +12,6 @@ use ockam_node::callback::CallbackSender;
 use ockam_node::{Context, WorkerBuilder};
 use ockam_vault::AeadSecretKeyHandle;
 use tracing::{debug, error, info, warn};
-use tracing_attributes::instrument;
 
 use crate::models::Identifier;
 use crate::secure_channel::decryptor::DecryptorHandler;
@@ -163,7 +162,7 @@ impl HandshakeWorker {
                     trust_policy,
                     authority.clone(),
                 )
-                    .await?,
+                .await?,
             )
         } else {
             Box::new(
@@ -176,7 +175,7 @@ impl HandshakeWorker {
                     trust_policy,
                     authority.clone(),
                 )
-                    .await?,
+                .await?,
             )
         };
 
@@ -454,7 +453,7 @@ impl HandshakeWorker {
             their_identifier,
             &handshake_results.handshake_keys.decryption_key,
         )
-            .await;
+        .await;
 
         info!(
             "Initialized SecureChannel {} at local: {}, remote: {}",

@@ -11,7 +11,7 @@ use tokio::net::TcpStream;
 use tokio_rustls::rustls::pki_types::ServerName;
 use tokio_rustls::rustls::{ClientConfig, RootCertStore};
 use tokio_rustls::{TlsConnector, TlsStream};
-use tracing::{debug, instrument};
+use tracing::debug;
 
 pub(crate) async fn connect(to: &HostnamePort) -> Result<(OwnedReadHalf, OwnedWriteHalf)> {
     Ok(create_tcp_stream(to).await?.into_split())

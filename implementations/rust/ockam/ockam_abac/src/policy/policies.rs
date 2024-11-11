@@ -9,7 +9,7 @@ use ockam_core::compat::vec::Vec;
 use ockam_core::Result;
 use ockam_identity::{Identifier, IdentitiesAttributes};
 use strum::IntoEnumIterator;
-use tracing::{debug, instrument};
+use tracing::debug;
 
 #[derive(Clone)]
 pub struct Policies {

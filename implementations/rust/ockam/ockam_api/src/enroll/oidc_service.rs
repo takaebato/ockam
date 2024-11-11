@@ -82,7 +82,7 @@ impl OidcService {
             self.provider().device_code_url(),
             &[("scope", self.scopes())],
         )
-            .await
+        .await
     }
 
     /// Request an authorization code for the PKCE OIDC flow
@@ -150,9 +150,9 @@ impl OidcService {
                 ("grant_type", "authorization_code".to_string()),
                 ("redirect_uri", self.provider().redirect_url().to_string()),
             ]
-                .as_slice(),
+            .as_slice(),
         )
-            .await
+        .await
     }
 
     /// Request a code from a given OIDC Provider URL

@@ -7,7 +7,6 @@ use std::{
 use colorful::Colorful;
 use miette::Context as _;
 use miette::{miette, IntoDiagnostic};
-use opentelemetry::trace::FutureExt;
 use tokio::runtime::Runtime;
 use tracing::{debug, error};
 
@@ -17,7 +16,7 @@ use ockam_api::cli_state::CliStateError;
 use ockam_api::colors::color_primary;
 use ockam_api::config::lookup::{InternetAddress, LookupMeta};
 use ockam_api::fmt_warn;
-use ockam_core::{DenyAll, OpenTelemetryContext};
+use ockam_core::DenyAll;
 use ockam_multiaddr::proto::{DnsAddr, Ip4, Ip6, Project, Space, Tcp};
 use ockam_multiaddr::{proto::Node, MultiAddr, Protocol};
 
@@ -43,9 +42,7 @@ where
     Fut: core::future::Future<Output = miette::Result<()>> + Send + 'static,
 {
     debug!("running '{}' asynchronously", command_name);
-    let res = embedded_node(opts, |ctx| {
-        async move { f(ctx).await }.with_context(OpenTelemetryContext::current_context())
-    });
+    let res = embedded_node(opts, |ctx| async move { f(ctx).await });
     local_cmd(res)
 }
 
@@ -60,22 +57,19 @@ where
         .no_logging()
         .with_runtime(opts.rt.clone())
         .build();
-    let res = executor.execute(
-        async move {
-            let child_ctx = ctx
-                .new_detached(
-                    Address::random_tagged("Detached.embedded_node"),
-                    DenyAll,
-                    DenyAll,
-                )
-                .await
-                .expect("Embedded node child ctx can't be created");
-            let r = f(child_ctx).await;
-            let _ = ctx.stop().await;
-            r
-        }
-        .with_context(OpenTelemetryContext::current_context()),
-    );
+    let res = executor.execute(async move {
+        let child_ctx = ctx
+            .new_detached(
+                Address::random_tagged("Detached.embedded_node"),
+                DenyAll,
+                DenyAll,
+            )
+            .await
+            .expect("Embedded node child ctx can't be created");
+        let r = f(child_ctx).await;
+        let _ = ctx.stop().await;
+        r
+    });
     match res {
         Ok(Err(e)) => Err(e),
         Ok(Ok(t)) => Ok(t),

@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::str::FromStr;
 
 use async_trait::async_trait;
@@ -14,12 +13,8 @@ use ockam::Address;
 use ockam::Context;
 use ockam_abac::PolicyExpression;
 use ockam_api::address::extract_address_value;
-use ockam_api::cli_state::journeys::{
-    JourneyEvent, NODE_NAME, TCP_OUTLET_AT, TCP_OUTLET_FROM, TCP_OUTLET_TO,
-};
 use ockam_api::colors::{color_primary, color_primary_alt};
 use ockam_api::fmt_ok;
-use ockam_api::nodes::models::portal::OutletStatus;
 use ockam_api::nodes::service::tcp_outlets::Outlets;
 use ockam_api::nodes::BackgroundNodeClient;
 
@@ -108,8 +103,6 @@ impl Command for CreateCommand {
             )
             .await?
         };
-        self.add_outlet_created_journey_event(&opts, &node_name, &outlet_status)
-            .await?;
 
         let worker_route = outlet_status.worker_route().into_diagnostic()?;
 
@@ -126,28 +119,6 @@ impl Command for CreateCommand {
             .json(serde_json::to_string(&outlet_status).into_diagnostic()?)
             .write_line()?;
 
-        Ok(())
-    }
-}
-
-impl CreateCommand {
-    pub async fn add_outlet_created_journey_event(
-        &self,
-        opts: &CommandGlobalOpts,
-        node_name: &str,
-        outlet_status: &OutletStatus,
-    ) -> miette::Result<()> {
-        let mut attributes = HashMap::new();
-        attributes.insert(TCP_OUTLET_AT, node_name.to_string());
-        attributes.insert(
-            TCP_OUTLET_FROM,
-            outlet_status.worker_route().into_diagnostic()?.to_string(),
-        );
-        attributes.insert(TCP_OUTLET_TO, self.to.to_string());
-        attributes.insert(NODE_NAME, node_name.to_string());
-        opts.state
-            .add_journey_event(JourneyEvent::TcpOutletCreated, attributes)
-            .await?;
         Ok(())
     }
 }

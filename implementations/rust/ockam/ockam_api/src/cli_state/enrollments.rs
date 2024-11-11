@@ -336,7 +336,7 @@ impl ExportedEnrollmentTicket {
             self.authority_change_history,
             self.authority_route,
         )
-            .await
+        .await
     }
 }
 
@@ -488,14 +488,14 @@ impl EnrollmentTicket {
             &project_change_history,
             Vault::create_verifying_vault(),
         )
-            .await?;
+        .await?;
         let authority_change_history = authority_change_history.into();
         let authority_identity = Identity::import_from_string(
             None,
             &authority_change_history,
             Vault::create_verifying_vault(),
         )
-            .await?;
+        .await?;
         let authority_route = match authority_route {
             Some(a) => MultiAddr::from_str(&a)?,
             None => MultiAddr::from_str(&format!(
@@ -538,7 +538,7 @@ impl EnrollmentTicket {
             authority_change_history,
             authority_route,
         )
-            .await
+        .await
     }
 
     pub async fn new_from_legacy(ticket: LegacyEnrollmentTicket) -> Result<Self> {
@@ -573,7 +573,7 @@ impl EnrollmentTicket {
             authority_change_history,
             authority_route,
         )
-            .await
+        .await
     }
 
     pub fn project(&self) -> Result<ProjectModel> {
@@ -722,8 +722,8 @@ mod tests {
                 project_change_history,
                 Vault::create_verifying_vault()
             )
-                .await
-                .unwrap()
+            .await
+            .unwrap()
         );
         assert_eq!(
             &enrollment_ticket.project_route,
@@ -736,8 +736,8 @@ mod tests {
                 authority_change_history,
                 Vault::create_verifying_vault()
             )
-                .await
-                .unwrap()
+            .await
+            .unwrap()
         );
         assert_eq!(
             &enrollment_ticket.authority_route,
@@ -756,16 +756,16 @@ mod tests {
             project_change_history,
             Vault::create_verifying_vault(),
         )
-            .await
-            .unwrap();
+        .await
+        .unwrap();
         let authority_change_history = "81825837830101583285f6820081582045d9dac79f226762025fc82e7407aee4a4c8e7068dc04edd44f1c777b8f0cf6bf41a66e2ee7b1a79aef17b8200815840c65ce655fd57cf2ea0b0679066a24bc99e2b223341186b5eaec951101f291e96c5fc8343291a23cbd8dc063ad1f9a9554f036e8f34ab5388e444977e7e29ab0b";
         let authority_identity = Identity::import_from_string(
             None,
             authority_change_history,
             Vault::create_verifying_vault(),
         )
-            .await
-            .unwrap();
+        .await
+        .unwrap();
         let exported = ExportedEnrollmentTicket::new(
             otc.clone(),
             ProjectRoute::new_with_id(project_id).unwrap(),

@@ -13,8 +13,6 @@ use crate::nodes::service::{
     SecureChannelType,
 };
 
-use crate::cli_state::journeys::{NODE_NAME, USER_EMAIL, USER_NAME};
-use crate::logs::CurrentSpan;
 use crate::{ApiError, CliState, DefaultAddress};
 use miette::IntoDiagnostic;
 use ockam::identity::{
@@ -184,7 +182,7 @@ impl NodeManager {
                 rendezvous_route,
                 options,
             )
-                .await?;
+            .await?;
 
             if let Some(api_sc_listener) = &s.api_sc_listener {
                 ctx.flow_controls().add_consumer(
@@ -448,8 +446,8 @@ impl NodeManager {
             &caller_identifier,
             credential_retriever_creator,
         )
-            .await
-            .into_diagnostic()
+        .await
+        .into_diagnostic()
     }
 
     pub async fn create_authority_client_with_authority(
@@ -470,25 +468,19 @@ impl NodeManager {
             &caller_identifier,
             None,
         )
-            .await
-            .into_diagnostic()
+        .await
+        .into_diagnostic()
     }
 
     /// Return a Controller client to send requests to the Controller
     pub async fn create_controller(&self) -> miette::Result<ControllerClient> {
-        if let Ok(user) = self.cli_state.get_default_user().await {
-            CurrentSpan::set_attribute(USER_NAME, &user.name);
-            CurrentSpan::set_attribute(USER_EMAIL, &user.email.to_string());
-        }
-        CurrentSpan::set_attribute(NODE_NAME, &self.node_name);
-
         self.controller_node_client(
             &self.tcp_transport,
             self.secure_channels.clone(),
             &self.identifier(),
         )
-            .await
-            .into_diagnostic()
+        .await
+        .into_diagnostic()
     }
 
     pub async fn create_project_client(
@@ -507,8 +499,8 @@ impl NodeManager {
                 .into_diagnostic()?,
             credentials_enabled,
         )
-            .await
-            .into_diagnostic()
+        .await
+        .into_diagnostic()
     }
 
     pub(crate) async fn access_control(

@@ -1,9 +1,6 @@
-#[cfg(feature = "std")]
-use crate::OpenTelemetryContext;
 use crate::{compat::vec::Vec, route, Address, Message, Route, TransportMessage};
 
 use crate::{LocalInfo, Result};
-use cfg_if::cfg_if;
 use serde::{Deserialize, Serialize};
 
 /// A message type that is routed locally within a single node.
@@ -51,9 +48,6 @@ pub struct LocalMessage {
     /// independently of its payload. For example this can be used to store the identifier that
     /// was used to encrypt the payload
     pub local_info: Vec<LocalInfo>,
-    /// Local tracing context
-    #[cfg(feature = "std")]
-    pub tracing_context: OpenTelemetryContext,
 }
 
 impl LocalMessage {
@@ -184,28 +178,12 @@ impl LocalMessage {
         self.local_info.clear()
     }
 
-    /// Get the tracing context associated to this local message
-    #[cfg(feature = "std")]
-    pub fn tracing_context(&self) -> OpenTelemetryContext {
-        self.tracing_context.clone()
-    }
-
     /// Create a [`LocalMessage`] from a decoded [`TransportMessage`]
     pub fn from_transport_message(transport_message: TransportMessage) -> LocalMessage {
-        cfg_if! {
-            if #[cfg(feature = "std")] {
-                LocalMessage::new()
-                    .with_tracing_context(transport_message.tracing_context())
-                    .with_onward_route(transport_message.onward_route)
-                    .with_return_route(transport_message.return_route)
-                    .with_payload(transport_message.payload)
-                } else {
-                LocalMessage::new()
-                    .with_onward_route(transport_message.onward_route)
-                    .with_return_route(transport_message.return_route)
-                    .with_payload(transport_message.payload)
-            }
-        }
+        LocalMessage::new()
+            .with_onward_route(transport_message.onward_route)
+            .with_return_route(transport_message.return_route)
+            .with_payload(transport_message.payload)
     }
 
     /// Create a [`TransportMessage`] from a [`LocalMessage`]
@@ -218,55 +196,7 @@ impl LocalMessage {
             self.payload,
             None,
         );
-
-        cfg_if! {
-            if #[cfg(feature = "std")] {
-                // make sure to pass the latest tracing context
-                let new_tracing_context = Self::start_new_tracing_context(self.tracing_context.update(), "TransportMessage");
-                transport_message.with_tracing_context(new_tracing_context)
-            } else {
-                transport_message
-            }
-        }
-    }
-
-    /// - A new trace is started
-    /// - The previous trace and the new trace are linked together
-    ///
-    /// We start a new trace here in order to make sure that each transport message is always
-    /// associated to a globally unique trace id and then cannot be correlated with another transport
-    /// message that would leave the same node for example.
-    ///
-    /// We can still navigate the two created traces as one thanks to their link.
-    #[cfg(feature = "std")]
-    pub fn start_new_tracing_context(
-        tracing_context: OpenTelemetryContext,
-        span_prefix: &str,
-    ) -> String {
-        use crate::OCKAM_TRACER_NAME;
-        use opentelemetry::trace::{Link, SpanBuilder, TraceContextExt, Tracer};
-        use opentelemetry::{global, Context};
-
-        // start a new trace for this transport message, and link it to the previous trace, via the current tracing context
-        let tracer = global::tracer(OCKAM_TRACER_NAME);
-        let span_builder = SpanBuilder::from_name(format!("{}::start_trace", span_prefix))
-            .with_links(vec![Link::new(
-                tracing_context.extract().span().span_context().clone(),
-                vec![],
-                0,
-            )]);
-        let span = tracer.build_with_context(span_builder, &Context::default());
-        let cx = Context::current_with_span(span);
-
-        // create a span to close the previous trace and link it to the new trace
-        let span_builder = SpanBuilder::from_name(format!("{}::end_trace", span_prefix))
-            .with_links(vec![Link::new(cx.span().span_context().clone(), vec![], 0)]);
-        let _ = tracer.build_with_context(span_builder, &tracing_context.extract());
-
-        // create the new opentelemetry context
-        let new_tracing_context = OpenTelemetryContext::inject(&cx);
-
-        new_tracing_context.to_string()
+        transport_message
     }
 }
 
@@ -289,8 +219,6 @@ impl LocalMessage {
             return_route,
             payload,
             local_info,
-            #[cfg(feature = "std")]
-            tracing_context: OpenTelemetryContext::current(),
         }
     }
 
@@ -324,14 +252,5 @@ impl LocalMessage {
     /// Specify the local information for the message
     pub fn with_local_info(self, local_info: Vec<LocalInfo>) -> Self {
         Self { local_info, ..self }
-    }
-
-    /// Specify the tracing context
-    #[cfg(feature = "std")]
-    pub fn with_tracing_context(self, tracing_context: OpenTelemetryContext) -> Self {
-        Self {
-            tracing_context,
-            ..self
-        }
     }
 }

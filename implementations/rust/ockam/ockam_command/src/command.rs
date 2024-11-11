@@ -1,13 +1,8 @@
 use clap::Parser;
 use colorful::Colorful;
 use ockam_api::fmt_warn;
-use opentelemetry::trace::{Link, SpanBuilder, TraceContextExt, Tracer};
-use opentelemetry::{global, Context};
-use tracing::{instrument, warn};
+use tracing::warn;
 
-use ockam_core::OCKAM_TRACER_NAME;
-
-use crate::command_events::{add_command_error_event, add_command_event};
 use crate::command_global_opts::CommandGlobalOpts;
 use crate::global_args::GlobalArgs;
 use crate::subcommand::OckamSubcommand;
@@ -79,49 +74,8 @@ impl OckamCommand {
                 .write_line(fmt_warn!("Failed to check for upgrade"))?;
         }
 
-        let tracer = global::tracer(OCKAM_TRACER_NAME);
-        let command_name = self.subcommand.name();
-        let result =
-            if let Some(opentelemetry_context) = self.subcommand.get_opentelemetry_context() {
-                let context = Context::current();
-                let span_builder = SpanBuilder::from_name(command_name.clone().to_string())
-                    .with_links(vec![Link::new(
-                        opentelemetry_context
-                            .extract()
-                            .span()
-                            .span_context()
-                            .clone(),
-                        vec![],
-                        0,
-                    )]);
-                let span = tracer.build_with_context(span_builder, &context);
-                let cx = Context::current_with_span(span);
-                let _guard = cx.clone().attach();
-                self.run_command(options.clone(), &command_name, &arguments)
-            } else {
-                tracer.in_span(command_name.clone(), |_| {
-                    self.run_command(options.clone(), &command_name, &arguments)
-                })
-            };
-        if let Err(ref e) = result {
-            add_command_error_event(
-                options.state.clone(),
-                &command_name,
-                &format!("{e}"),
-                arguments.join(" "),
-            )?
-        };
+        let result = self.subcommand.run(options.clone());
         options.shutdown();
         result
-    }
-
-    fn run_command(
-        self,
-        opts: CommandGlobalOpts,
-        command_name: &str,
-        arguments: &[String],
-    ) -> miette::Result<()> {
-        add_command_event(opts.state.clone(), command_name, arguments.join(" "))?;
-        self.subcommand.run(opts)
     }
 }

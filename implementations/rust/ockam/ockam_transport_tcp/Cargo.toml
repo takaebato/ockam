@@ -24,7 +24,7 @@ TCP Transport for the Ockam Routing Protocol.
 
 [features]
 default = ["std", "ring", "privileged_portals"]
-std = ["ockam_macros/std", "ockam_transport_core/std", "opentelemetry", "binary-layout?/std"]
+std = ["ockam_macros/std", "ockam_transport_core/std", "binary-layout?/std"]
 no_std = ["ockam_macros/no_std", "ockam_transport_core/no_std"]
 alloc = []
 aws-lc = ["tokio-rustls/aws-lc-rs"]
@@ -43,7 +43,6 @@ ockam_core = { path = "../ockam_core", version = "^0.119.0" }
 ockam_macros = { path = "../ockam_macros", version = "^0.35.0" }
 ockam_node = { path = "../ockam_node", version = "^0.131.0" }
 ockam_transport_core = { path = "../ockam_transport_core", version = "^0.96.0" }
-opentelemetry = { version = "0.26.0", features = ["logs", "metrics", "trace"], optional = true }
 rand = "0.8"
 rustls = { version = "0.23", default-features = false }
 rustls-native-certs = "0.8"

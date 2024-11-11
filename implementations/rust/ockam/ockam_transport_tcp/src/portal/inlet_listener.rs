@@ -17,7 +17,7 @@ use std::time::Duration;
 use tokio::net::TcpListener;
 use tokio::time::Instant;
 use tokio_rustls::{TlsAcceptor, TlsStream};
-use tracing::{debug, error, instrument};
+use tracing::{debug, error};
 
 /// A TCP Portal Inlet listen processor
 ///
@@ -223,7 +223,7 @@ impl Processor for TcpInletListenProcessor {
             self.options.incoming_access_control.clone(),
             self.options.outgoing_access_control.clone(),
         )
-            .await?;
+        .await?;
 
         Ok(true)
     }

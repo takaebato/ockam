@@ -27,7 +27,6 @@ use crate::{fmt_warn, ConnectionStatus};
 /// The methods below support the creation and update of local nodes
 impl CliState {
     /// Create a node, with some optional associated values, and start it
-    ))]
     pub async fn start_node_with_optional_values(
         &self,
         node_name: &str,
@@ -56,7 +55,6 @@ impl CliState {
     ///
     ///  - an identity name. That identity is used by the `NodeManager` to create secure channels
     ///  - a project name. It is used to create policies on resources provisioned on a node (like a TCP outlet for example)
-    ))]
     pub async fn create_node_with_optional_values(
         &self,
         node_name: &str,
@@ -716,7 +714,7 @@ mod tests {
             node_name,
             &SocketAddr::from_str("127.0.0.1:0").unwrap().into(),
         )
-            .await?;
+        .await?;
 
         // recreate the node with the same name
         let _ = cli.create_node(node_name).await?;

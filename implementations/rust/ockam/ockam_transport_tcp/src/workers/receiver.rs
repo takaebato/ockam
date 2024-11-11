@@ -16,7 +16,7 @@ use ockam_core::{Processor, Result};
 use ockam_node::{Context, ProcessorBuilder};
 use ockam_transport_core::TransportError;
 use tokio::{io::AsyncReadExt, net::tcp::OwnedReadHalf};
-use tracing::{info, instrument, trace};
+use tracing::{info, trace};
 
 /// A TCP receiving message processor
 ///
@@ -106,7 +106,7 @@ impl TcpRecvProcessor {
             TcpSendWorkerMsg::ConnectionClosed,
             self.addresses.receiver_internal_address().clone(),
         )
-            .await
+        .await
     }
 }
 
@@ -143,7 +143,7 @@ impl Processor for TcpRecvProcessor {
                         protocol_version
                     ),
                 )
-                    .await?;
+                .await?;
 
                 return Err(err)?;
             }
@@ -186,7 +186,7 @@ impl Processor for TcpRecvProcessor {
                     ctx,
                     format!("Received message len doesn't fit usize: {}", len),
                 )
-                    .await?;
+                .await?;
                 return Ok(false);
             }
         };
@@ -199,7 +199,7 @@ impl Processor for TcpRecvProcessor {
                     len_usize, MAX_MESSAGE_SIZE
                 ),
             )
-                .await?;
+            .await?;
             return Ok(false);
         }
 

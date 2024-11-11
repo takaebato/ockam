@@ -1,8 +1,5 @@
-use cfg_if::cfg_if;
 use minicbor::{CborLen, Decode, Encode};
 use ockam_core::compat::string::String;
-#[cfg(feature = "std")]
-use ockam_core::OpenTelemetryContext;
 use ockam_core::{CowBytes, LocalMessage, Route};
 
 /// Ockam Routing Message that we want to send to the other side via UDP.
@@ -41,32 +38,11 @@ impl<'a> UdpRoutingMessage<'a> {
             tracing_context: self.tracing_context,
         }
     }
-
-    /// Specify the tracing context
-    #[cfg(feature = "std")]
-    pub fn with_tracing_context(self, tracing_context: String) -> Self {
-        Self {
-            tracing_context: Some(tracing_context),
-            ..self
-        }
-    }
-
-    /// Return the tracing context
-    #[cfg(feature = "std")]
-    pub fn tracing_context(&self) -> OpenTelemetryContext {
-        match self.tracing_context.as_ref() {
-            Some(tracing_context) => OpenTelemetryContext::from_remote_context(tracing_context),
-            None => OpenTelemetryContext::current(),
-        }
-    }
 }
 
 impl From<UdpRoutingMessage<'_>> for LocalMessage {
     fn from(value: UdpRoutingMessage) -> Self {
         let local_message = LocalMessage::new();
-
-        #[cfg(feature = "std")]
-        let local_message = local_message.with_tracing_context(value.tracing_context());
 
         local_message
             .with_onward_route(value.onward_route)
@@ -83,15 +59,6 @@ impl From<LocalMessage> for UdpRoutingMessage<'_> {
             CowBytes::from(value.payload),
             None,
         );
-
-        cfg_if! {
-            if #[cfg(feature = "std")] {
-                // make sure to pass the latest tracing context
-                let new_tracing_context = LocalMessage::start_new_tracing_context(value.tracing_context.update(), "UdpRoutingMessage");
-                routing_message.with_tracing_context(new_tracing_context)
-            } else {
-                routing_message
-            }
-        }
+        routing_message
     }
 }

@@ -8,13 +8,11 @@ use miette::{miette, IntoDiagnostic, WrapErr};
 use opentelemetry::trace::TraceContextExt;
 use opentelemetry::KeyValue;
 use regex::Regex;
-use tracing::instrument;
 
 use ockam_api::cli_state::random_name;
 use ockam_api::colors::{color_error, color_primary};
 use ockam_api::terminal::notification::NotificationHandler;
 use ockam_api::{fmt_log, fmt_ok};
-use ockam_core::{opentelemetry_context_parser, OpenTelemetryContext};
 use ockam_node::Context;
 
 use crate::node::config::NodeConfig;
@@ -112,10 +110,6 @@ pub struct CreateCommand {
 
     #[command(flatten)]
     pub trust_opts: TrustOpts,
-
-    /// Serialized opentelemetry context
-    #[arg(hide = true, long, value_parser = opentelemetry_context_parser)]
-    pub opentelemetry_context: Option<OpenTelemetryContext>,
 }
 
 impl Default for CreateCommand {
@@ -137,7 +131,6 @@ impl Default for CreateCommand {
             launch_configuration: None,
             identity: None,
             trust_opts: node_manager_defaults.trust_opts,
-            opentelemetry_context: None,
             foreground_args: ForegroundArgs {
                 foreground: false,
                 exit_on_eof: false,
@@ -270,7 +263,7 @@ impl CreateCommand {
             "{}",
             fmt_ok!("Created a new Node named {}", color_primary(node_name))
         )
-            .into_diagnostic()?;
+        .into_diagnostic()?;
         if opts.state.get_node(node_name).await?.is_default() {
             writeln!(
                 buf,
@@ -280,7 +273,7 @@ impl CreateCommand {
                     color_primary(node_name)
                 )
             )
-                .into_diagnostic()?;
+            .into_diagnostic()?;
         }
         writeln!(
             buf,
@@ -290,7 +283,7 @@ impl CreateCommand {
                 color_primary(format!("ockam node show {}", node_name))
             )
         )
-            .into_diagnostic()?;
+        .into_diagnostic()?;
         Ok(buf)
     }
 

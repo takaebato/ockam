@@ -1,7 +1,6 @@
 use core::sync::atomic::{AtomicBool, Ordering};
 
 use tracing::{debug, error, info, warn};
-use tracing_attributes::instrument;
 
 use ockam_core::compat::boxed::Box;
 use ockam_core::compat::sync::{Arc, RwLock};
@@ -272,7 +271,7 @@ impl EncryptorWorker {
             NeutralMessage::from(msg),
             self.addresses.encryptor.clone(),
         )
-            .await?;
+        .await?;
 
         self.last_presented_credential = Some(credential);
 
@@ -293,7 +292,7 @@ impl EncryptorWorker {
             NeutralMessage::from(msg),
             self.addresses.encryptor.clone(),
         )
-            .await?;
+        .await?;
 
         Ok(())
     }

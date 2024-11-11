@@ -58,7 +58,7 @@ impl NodeManager {
             caller_identifier,
             credential_retriever_creator,
         )
-            .await
+        .await
     }
 
     pub(crate) async fn make_project_node_client(
@@ -83,7 +83,7 @@ impl NodeManager {
             project_multiaddr,
             caller_identifier,
         )
-            .await
+        .await
     }
 
     pub async fn make_secure_client(
@@ -99,7 +99,7 @@ impl NodeManager {
             multiaddr,
             caller_identifier,
         )
-            .await
+        .await
     }
 
     pub async fn controller_node_client(

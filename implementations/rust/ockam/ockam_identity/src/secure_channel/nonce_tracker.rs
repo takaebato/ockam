@@ -1,6 +1,5 @@
 use crate::secure_channel::encryptor::KEY_RENEWAL_INTERVAL;
 use crate::{IdentityError, Nonce};
-use tracing_attributes::instrument;
 
 /// fails compilation if [`KEY_RENEWAL_INTERVAL`] + 1 is bigger than [`BitmapType::BITS`].
 ///

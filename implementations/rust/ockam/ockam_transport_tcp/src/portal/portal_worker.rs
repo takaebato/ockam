@@ -16,7 +16,7 @@ use tokio::io::{AsyncRead, AsyncWriteExt, ReadHalf, WriteHalf};
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
 use tokio::net::TcpStream;
 use tokio_rustls::TlsStream;
-use tracing::{debug, info, instrument, trace, warn};
+use tracing::{debug, info, trace, warn};
 
 /// Enumerate all `TcpPortalWorker` states
 ///
@@ -90,7 +90,7 @@ impl TcpPortalWorker {
             incoming_access_control,
             outgoing_access_control,
         )
-            .await
+        .await
     }
 
     /// Start a new `TcpPortalWorker` of type [`TypeName::Outlet`]
@@ -118,7 +118,7 @@ impl TcpPortalWorker {
             incoming_access_control,
             outgoing_access_control,
         )
-            .await
+        .await
     }
 
     /// Start a new `TcpPortalWorker`
@@ -260,7 +260,7 @@ impl TcpPortalWorker {
                 PortalMessage::Disconnect.to_neutral_message()?,
                 self.addresses.sender_remote.clone(),
             )
-                .await?;
+            .await?;
 
             debug!(
                 "Notified the other side from {:?} at: {} about connection drop",
@@ -355,7 +355,7 @@ impl TcpPortalWorker {
             PortalMessage::Ping.to_neutral_message()?,
             self.addresses.sender_remote.clone(),
         )
-            .await?;
+        .await?;
 
         debug!("Inlet at: {} sent ping", self.addresses.sender_internal);
 
@@ -387,7 +387,7 @@ impl TcpPortalWorker {
             PortalMessage::Pong.to_neutral_message()?,
             self.addresses.sender_remote.clone(),
         )
-            .await?;
+        .await?;
 
         self.start_receiver(ctx, pong_route.clone()).await?;
 

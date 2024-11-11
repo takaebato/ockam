@@ -1,8 +1,6 @@
 use crate::alloc::string::ToString;
 use crate::compat::string::String;
 use crate::errcode::{Kind, Origin};
-#[cfg(feature = "std")]
-use crate::OpenTelemetryContext;
 use crate::{compat::vec::Vec, Decodable, Encodable, Encoded, Message, Route};
 use crate::{Error, Result};
 use core::fmt::{self, Display, Formatter};
@@ -137,15 +135,6 @@ impl TransportMessage {
                 Kind::Serialization,
                 format!("Unsupported version: {v}"),
             )),
-        }
-    }
-
-    /// Return the tracing context
-    #[cfg(feature = "std")]
-    pub fn tracing_context(&self) -> OpenTelemetryContext {
-        match self.tracing_context.as_ref() {
-            Some(tracing_context) => OpenTelemetryContext::from_remote_context(tracing_context),
-            None => OpenTelemetryContext::current(),
         }
     }
 }

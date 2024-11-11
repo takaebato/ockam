@@ -1,14 +1,11 @@
 use colorful::Colorful;
 use miette::{miette, IntoDiagnostic};
-use tracing::{debug, instrument};
+use tracing::debug;
 
 use ockam::Context;
-use ockam_api::cli_state::journeys::{JourneyEvent, NODE_NAME};
 use ockam_api::colors::color_primary;
 use ockam_api::fmt_warn;
-use ockam_api::logs::CurrentSpan;
 use ockam_api::nodes::BackgroundNodeClient;
-use ockam_core::OpenTelemetryContext;
 
 use crate::node::show::get_node_resources;
 use crate::node::util::spawn_node;
@@ -24,7 +21,6 @@ impl CreateCommand {
     ) -> miette::Result<()> {
         let node_name = self.name.clone();
         debug!(%node_name, "creating node in background mode");
-        CurrentSpan::set_attribute(NODE_NAME, node_name.as_str());
 
         // Early checks
         if self.foreground_args.child_process {
@@ -46,24 +42,9 @@ impl CreateCommand {
             ));
         }
         self.get_or_create_identity(&opts, &self.identity).await?;
-
-        // Create node and wait for it to be up
-        let cmd_with_trace_context = CreateCommand {
-            opentelemetry_context: self
-                .opentelemetry_context
-                .clone()
-                .or(Some(OpenTelemetryContext::current())),
-            ..self.clone()
-        };
-        cmd_with_trace_context.spawn_background_node(&opts).await?;
+        self.clone().spawn_background_node(&opts).await?;
         let mut node = BackgroundNodeClient::create_to_node(ctx, &opts.state, &node_name).await?;
         let node_resources = get_node_resources(ctx, &opts.state, &mut node, true).await?;
-        opts.state
-            .add_journey_event(
-                JourneyEvent::NodeCreated,
-                [(NODE_NAME, node_name.clone())].into(),
-            )
-            .await?;
 
         // Output
         if !node_resources.status.is_running() {

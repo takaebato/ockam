@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::str::FromStr;
 use std::time::Duration;
 
@@ -18,10 +17,6 @@ use ockam::transport::HostnamePort;
 use ockam::Context;
 use ockam_abac::PolicyExpression;
 use ockam_api::address::extract_address_value;
-use ockam_api::cli_state::journeys::{
-    JourneyEvent, NODE_NAME, TCP_INLET_ALIAS, TCP_INLET_AT, TCP_INLET_CONNECTION_STATUS,
-    TCP_INLET_FROM, TCP_INLET_TO,
-};
 use ockam_api::cli_state::{random_name, CliState};
 use ockam_api::colors::{color_primary, color_primary_alt};
 use ockam_api::nodes::models::portal::InletStatus;
@@ -48,7 +43,8 @@ pub struct CreateCommand {
     pub at: Option<String>,
 
     /// Address on which to accept TCP connections.
-    #[arg(long, display_order = 900, id = "SOCKET_ADDRESS", hide_default_value = true, default_value_t = default_from_addr(), value_parser = hostname_parser)]
+    #[arg(long, display_order = 900, id = "SOCKET_ADDRESS", hide_default_value = true, default_value_t = default_from_addr(), value_parser = hostname_parser
+    )]
     pub from: HostnamePort,
 
     /// Route to a TCP Outlet or the name of the TCP Outlet service you want to connect to.
@@ -97,11 +93,13 @@ pub struct CreateCommand {
     pub allow: Option<PolicyExpression>,
 
     /// Time to wait for the outlet to be available.
-    #[arg(long, display_order = 900, id = "WAIT", default_value = "5s", value_parser = duration_parser)]
+    #[arg(long, display_order = 900, id = "WAIT", default_value = "5s", value_parser = duration_parser
+    )]
     pub connection_wait: Duration,
 
     /// Time to wait before retrying to connect to the TCP Outlet.
-    #[arg(long, display_order = 900, id = "RETRY", default_value = "20s", value_parser = duration_parser)]
+    #[arg(long, display_order = 900, id = "RETRY", default_value = "20s", value_parser = duration_parser
+    )]
     pub retry_wait: Duration,
 
     #[command(flatten)]
@@ -236,8 +234,6 @@ impl Command for CreateCommand {
         };
 
         let node_name = node.node_name();
-        cmd.add_inlet_created_event(&opts, &node_name, &inlet_status)
-            .await?;
 
         let created_message = fmt_ok!(
             "Created a new {} in the Node {} bound to {}\n",
@@ -296,25 +292,6 @@ impl CreateCommand {
         } else {
             Ok(None)
         }
-    }
-
-    pub async fn add_inlet_created_event(
-        &self,
-        opts: &CommandGlobalOpts,
-        node_name: &str,
-        inlet: &InletStatus,
-    ) -> miette::Result<()> {
-        let mut attributes = HashMap::new();
-        attributes.insert(TCP_INLET_AT, node_name.to_string());
-        attributes.insert(TCP_INLET_FROM, self.from.to_string());
-        attributes.insert(TCP_INLET_TO, self.to.clone());
-        attributes.insert(TCP_INLET_ALIAS, inlet.alias.clone());
-        attributes.insert(TCP_INLET_CONNECTION_STATUS, inlet.status.to_string());
-        attributes.insert(NODE_NAME, node_name.to_string());
-        Ok(opts
-            .state
-            .add_journey_event(JourneyEvent::TcpInletCreated, attributes)
-            .await?)
     }
 
     pub async fn parse_args(mut self, opts: &CommandGlobalOpts) -> miette::Result<Self> {

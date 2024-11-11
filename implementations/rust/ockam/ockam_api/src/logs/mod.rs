@@ -17,7 +17,6 @@ mod log_exporters;
 pub mod logging_configuration;
 mod logging_options;
 pub mod setup;
-mod span_exporters;
 mod tracing_guard;
 mod tracing_options;
 
@@ -27,6 +26,5 @@ pub use log_exporters::*;
 pub use logging_configuration::*;
 pub use logging_options::*;
 pub use setup::*;
-pub use span_exporters::*;
 pub use tracing_guard::*;
 pub use tracing_options::*;

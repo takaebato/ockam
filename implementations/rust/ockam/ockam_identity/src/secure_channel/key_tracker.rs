@@ -1,7 +1,6 @@
 use ockam_core::Result;
 use ockam_vault::AeadSecretKeyHandle;
 use tracing::{trace, warn};
-use tracing_attributes::instrument;
 
 use crate::{IdentityError, Nonce};
 

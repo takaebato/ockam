@@ -1,6 +1,5 @@
 use opentelemetry::global;
 use opentelemetry_sdk::logs::LoggerProvider;
-use opentelemetry_sdk::trace::TracerProvider;
 use tracing_appender::non_blocking::WorkerGuard;
 
 /// The Tracing guard contains a guard closing the logging appender
@@ -10,20 +9,14 @@ use tracing_appender::non_blocking::WorkerGuard;
 pub struct TracingGuard {
     _worker_guard: Option<WorkerGuard>,
     logger_provider: Option<LoggerProvider>,
-    tracer_provider: Option<TracerProvider>,
 }
 
 impl TracingGuard {
     /// Create a new tracing guard
-    pub fn new(
-        worker_guard: WorkerGuard,
-        logger_provider: LoggerProvider,
-        tracer_provider: TracerProvider,
-    ) -> TracingGuard {
+    pub fn new(worker_guard: WorkerGuard, logger_provider: LoggerProvider) -> TracingGuard {
         TracingGuard {
             _worker_guard: Some(worker_guard),
             logger_provider: Some(logger_provider),
-            tracer_provider: Some(tracer_provider),
         }
     }
 
@@ -32,16 +25,6 @@ impl TracingGuard {
         TracingGuard {
             _worker_guard: Some(worker_guard),
             logger_provider: None,
-            tracer_provider: None,
-        }
-    }
-
-    /// Create a Tracing guard when only distributed tracing is activated
-    pub fn tracing_only(tracer_provider: TracerProvider) -> TracingGuard {
-        TracingGuard {
-            _worker_guard: None,
-            logger_provider: None,
-            tracer_provider: Some(tracer_provider),
         }
     }
 
@@ -55,9 +38,6 @@ impl TracingGuard {
     pub fn force_flush(&self) {
         if let Some(logger_provider) = self.logger_provider.as_ref() {
             logger_provider.force_flush();
-        }
-        if let Some(tracer_provider) = self.tracer_provider.as_ref() {
-            tracer_provider.force_flush();
         }
     }
 }

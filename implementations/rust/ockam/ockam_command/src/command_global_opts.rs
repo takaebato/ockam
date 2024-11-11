@@ -59,7 +59,7 @@ impl CommandGlobalOpts {
             global_args.output_format(),
         );
         let tracing_guard =
-            Self::setup_logging_tracing(cmd, &logging_configuration, &tracing_configuration);
+            Self::setup_logging_tracing(&logging_configuration, &tracing_configuration);
 
         Self::log_inputs(
             arguments,
@@ -109,7 +109,6 @@ impl CommandGlobalOpts {
     /// Set up a logger and a tracer for the current node
     /// If the node is a background node we always enable logging, regardless of environment variables
     fn setup_logging_tracing(
-        cmd: &OckamSubcommand,
         logging_configuration: &LoggingConfiguration,
         tracing_configuration: &ExportingConfiguration,
     ) -> Option<Arc<TracingGuard>> {
@@ -117,17 +116,7 @@ impl CommandGlobalOpts {
             return None;
         };
 
-        let app_name = if cmd.is_background_node() {
-            "local node"
-        } else {
-            "cli"
-        };
-        let tracing_guard = LoggingTracing::setup(
-            logging_configuration,
-            tracing_configuration,
-            app_name,
-            cmd.node_name(),
-        );
+        let tracing_guard = LoggingTracing::setup(logging_configuration);
         Some(Arc::new(tracing_guard))
     }
 

@@ -4,9 +4,7 @@ use miette::{miette, IntoDiagnostic};
 
 pub use config::Config;
 use ockam::Context;
-use ockam_api::cli_state::journeys::APPLICATION_EVENT_COMMAND_CONFIGURATION_FILE;
 use std::path::PathBuf;
-use tracing::{instrument, Span};
 
 use crate::util::async_cmd;
 use crate::{docs, CommandGlobalOpts};
@@ -76,11 +74,6 @@ impl RunCommand {
                 std::fs::read_to_string(path).into_diagnostic()?
             }
         };
-        // Record the provided file
-        Span::current().record(
-            APPLICATION_EVENT_COMMAND_CONFIGURATION_FILE.as_str(),
-            &contents,
-        );
         Config::parse_and_run(ctx, opts, contents).await
     }
 }

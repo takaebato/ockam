@@ -1,6 +1,6 @@
 use miette::IntoDiagnostic;
 use std::process::exit;
-use tracing::{error, info, instrument};
+use tracing::{error, info};
 
 use crate::rendezvous::create::CreateCommand;
 use crate::util::foreground_args::wait_for_exit_signal;
@@ -51,7 +51,7 @@ impl CreateCommand {
             &opts,
             "To exit and stop the Rendezvous Server, please press Ctrl+C\n",
         )
-            .await?;
+        .await?;
 
         // Clean up and exit
         if let Err(err) = healthcheck.stop().await {
