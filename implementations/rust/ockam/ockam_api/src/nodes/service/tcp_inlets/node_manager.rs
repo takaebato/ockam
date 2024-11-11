@@ -68,8 +68,7 @@ impl NodeManager {
 
         // the port could be zero, to simplify the following code we
         // resolve the address to a full socket address
-        let socket_addr =
-            ockam_node::compat::asynchronous::resolve_peer(listen_addr.to_string()).await?;
+        let socket_addr = ockam_node::compat::asynchronous::resolve_peer(&listen_addr).await?;
         let listen_addr = if listen_addr.port() == 0 {
             get_free_address_for(&socket_addr.ip().to_string())
                 .map_err(|err| ockam_core::Error::new(Origin::Transport, Kind::Invalid, err))?
