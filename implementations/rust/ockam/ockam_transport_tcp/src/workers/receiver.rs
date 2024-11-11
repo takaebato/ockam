@@ -56,7 +56,6 @@ impl TcpRecvProcessor {
     }
 
     #[allow(clippy::too_many_arguments)]
-    #[instrument(skip_all, name = "TcpRecvProcessor::start")]
     pub async fn start(
         ctx: &Context,
         registry: TcpRegistry,
@@ -107,7 +106,7 @@ impl TcpRecvProcessor {
             TcpSendWorkerMsg::ConnectionClosed,
             self.addresses.receiver_internal_address().clone(),
         )
-        .await
+            .await
     }
 }
 
@@ -115,7 +114,6 @@ impl TcpRecvProcessor {
 impl Processor for TcpRecvProcessor {
     type Context = Context;
 
-    #[instrument(skip_all, name = "TcpRecvProcessor::initialize")]
     async fn initialize(&mut self, ctx: &mut Context) -> Result<()> {
         ctx.set_cluster(crate::CLUSTER_NAME).await?;
 
@@ -145,7 +143,7 @@ impl Processor for TcpRecvProcessor {
                         protocol_version
                     ),
                 )
-                .await?;
+                    .await?;
 
                 return Err(err)?;
             }
@@ -154,7 +152,6 @@ impl Processor for TcpRecvProcessor {
         Ok(())
     }
 
-    #[instrument(skip_all, name = "TcpRecvProcessor::shutdown")]
     async fn shutdown(&mut self, ctx: &mut Self::Context) -> Result<()> {
         self.registry.remove_receiver_processor(&ctx.address());
 
@@ -172,7 +169,6 @@ impl Processor for TcpRecvProcessor {
     ///    Context to avoid spawning a zombie task.
     /// 3. We must also stop the TcpReceive loop when the worker gets
     ///    killed by the user or node.
-    #[instrument(skip_all, name = "TcpRecvProcessor::process", fields(worker = %ctx.address()))]
     async fn process(&mut self, ctx: &mut Context) -> Result<bool> {
         // Read the message length
         let len = match self.read_half.read_u32().await {
@@ -190,7 +186,7 @@ impl Processor for TcpRecvProcessor {
                     ctx,
                     format!("Received message len doesn't fit usize: {}", len),
                 )
-                .await?;
+                    .await?;
                 return Ok(false);
             }
         };
@@ -203,7 +199,7 @@ impl Processor for TcpRecvProcessor {
                     len_usize, MAX_MESSAGE_SIZE
                 ),
             )
-            .await?;
+                .await?;
             return Ok(false);
         }
 

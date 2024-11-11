@@ -277,7 +277,6 @@ impl VaultForSecureChannels for SoftwareVaultForSecureChannels {
         Ok(HkdfOutput(Sha256HkdfOutput(output)))
     }
 
-    #[instrument(skip_all)]
     async fn aead_encrypt(
         &self,
         destination: &mut Vec<u8>,
@@ -291,7 +290,6 @@ impl VaultForSecureChannels for SoftwareVaultForSecureChannels {
         aes.encrypt_message(destination, plain_text, nonce, aad)
     }
 
-    #[instrument(skip_all)]
     async fn aead_decrypt(
         &self,
         secret_key_handle: &AeadSecretKeyHandle,
@@ -304,7 +302,6 @@ impl VaultForSecureChannels for SoftwareVaultForSecureChannels {
         aes.decrypt_message(cipher_text, nonce, aad)
     }
 
-    #[instrument(skip_all)]
     async fn persist_aead_key(&self, secret_key_handle: &AeadSecretKeyHandle) -> Result<()> {
         let secret = self.get_aead_secret(secret_key_handle).await?;
         self.secrets_repository
@@ -312,7 +309,6 @@ impl VaultForSecureChannels for SoftwareVaultForSecureChannels {
             .await
     }
 
-    #[instrument(skip_all)]
     async fn load_aead_key(&self, secret_key_handle: &AeadSecretKeyHandle) -> Result<()> {
         let Some(secret) = self
             .secrets_repository
@@ -425,7 +421,6 @@ impl VaultForSecureChannels for SoftwareVaultForSecureChannels {
         Ok(handle)
     }
 
-    #[instrument(skip_all)]
     async fn delete_aead_secret_key(&self, secret_key_handle: AeadSecretKeyHandle) -> Result<bool> {
         Ok(self
             .ephemeral_aead_secrets

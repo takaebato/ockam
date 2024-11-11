@@ -198,7 +198,6 @@ impl ControllerClient {
         Ok(())
     }
 
-    #[instrument(skip_all)]
     pub async fn list_projects(&self, ctx: &Context) -> miette::Result<Vec<ProjectModel>> {
         let req = Request::get("/v0");
         self.get_secure_client()
@@ -259,6 +258,6 @@ impl ControllerClient {
                 ))
             }
         })
-        .await
+            .await
     }
 }

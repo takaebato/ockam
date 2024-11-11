@@ -44,7 +44,6 @@ impl RunCommand {
         "run".to_string()
     }
 
-    #[instrument(skip_all, fields(app.event.command.configuration_file))]
     async fn async_run(&self, ctx: &Context, opts: CommandGlobalOpts) -> miette::Result<()> {
         let contents = match &self.inline {
             Some(contents) => contents.to_string(),

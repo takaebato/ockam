@@ -34,7 +34,8 @@ pub struct ConfigArgs {
     /// The variables passed here will have precedence over global environment variables.
     /// This argument can be used multiple times, each time adding a new key-value pair.
     /// Example: `--variable KEY1=VALUE1 --variable KEY2=VALUE2`
-    #[arg(long = "variable", value_name = "VARIABLE", value_parser = parse_key_val::<String, String>)]
+    #[arg(long = "variable", value_name = "VARIABLE", value_parser = parse_key_val::<String, String>
+    )]
     pub variables: Vec<(String, String)>,
 
     /// A flag used internally to indicate that the node was started from a configuration file.
@@ -44,7 +45,6 @@ pub struct ConfigArgs {
 
 impl CreateCommand {
     /// Run the creation of a node using a node configuration
-    #[instrument(skip_all)]
     pub async fn run_config(self, ctx: &Context, opts: CommandGlobalOpts) -> miette::Result<()> {
         debug!("Running node create with a node config");
         let mut node_config = self.get_node_config().await?;
@@ -75,7 +75,6 @@ impl CreateCommand {
     ///  - a local path to a configuration file
     ///  - an inline configuration
     /// or read the `configuration` argument
-    #[instrument(skip_all, fields(app.event.command.configuration_file))]
     pub async fn get_node_config(&self) -> miette::Result<NodeConfig> {
         let contents = match self.config_args.configuration.clone() {
             Some(contents) => contents,
@@ -281,7 +280,7 @@ impl NodeConfig {
             // This prevents the current process from handling the signal and, for example,
             // add a newline to the terminal before the child process has finished writing its output.
         })
-        .expect("Error setting exit signal handler");
+            .expect("Error setting exit signal handler");
 
         // Run the other sections
         let node_name = Some(node_name);
@@ -492,7 +491,7 @@ mod tests {
             name: n1
             tcp-listener-address: 127.0.0.1:5555
         "#
-        .to_string();
+            .to_string();
         let mut config = NodeConfig::parse(contents).unwrap();
         config.merge(&cli_args).unwrap();
         let node = config.node.into_parsed_commands().unwrap().pop().unwrap();

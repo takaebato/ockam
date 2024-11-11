@@ -17,7 +17,6 @@ use crate::CommandGlobalOpts;
 
 impl CreateCommand {
     // Create a new node running in the background (i.e. another, new OS process)
-    #[instrument(skip_all)]
     pub(crate) async fn background_mode(
         &self,
         ctx: &Context,

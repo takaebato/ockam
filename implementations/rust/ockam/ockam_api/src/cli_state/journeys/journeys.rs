@@ -76,7 +76,6 @@ const DEFAULT_JOURNEY_MAX_DURATION: Duration = Duration::from_secs(5 * 86400);
 ///
 impl CliState {
     /// This method adds a successful event to the project/host journeys
-    #[instrument(skip_all)]
     pub async fn add_journey_event(
         &self,
         event: JourneyEvent,
@@ -86,7 +85,6 @@ impl CliState {
     }
 
     /// This method adds an error event to the project/host journeys
-    #[instrument(skip_all)]
     pub async fn add_journey_error(
         &self,
         command_name: &str,
@@ -97,7 +95,7 @@ impl CliState {
             JourneyEvent::error(command_name.to_string(), message),
             attributes,
         )
-        .await
+            .await
     }
 
     /// Add a journey event
@@ -247,7 +245,7 @@ impl CliState {
                         Some(journey.opentelemetry_context()),
                         now,
                     )
-                    .await?
+                        .await?
                 }
                 None => self.create_project_journey(&project_id, None, now).await?,
             };

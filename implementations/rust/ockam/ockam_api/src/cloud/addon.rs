@@ -115,7 +115,6 @@ pub trait Addons {
 
 #[async_trait]
 impl Addons for ControllerClient {
-    #[instrument(skip_all, fields(project_id = project_id))]
     async fn list_addons(&self, ctx: &Context, project_id: &str) -> miette::Result<Vec<Addon>> {
         trace!(target: TARGET, project_id, "listing addons");
         let req = Request::get(format!("/v0/{project_id}/addons"));
@@ -126,7 +125,6 @@ impl Addons for ControllerClient {
             .miette_success("list addons")
     }
 
-    #[instrument(skip_all, fields(project_id = project_id))]
     async fn configure_confluent_addon(
         &self,
         ctx: &Context,
@@ -137,7 +135,7 @@ impl Addons for ControllerClient {
         let req = Request::post(format!(
             "/v1/projects/{project_id}/configure_addon/confluent"
         ))
-        .body(config);
+            .body(config);
         self.get_secure_client()
             .ask(ctx, API_SERVICE, req)
             .await
@@ -145,7 +143,6 @@ impl Addons for ControllerClient {
             .miette_success("configure kafka addon")
     }
 
-    #[instrument(skip_all, fields(project_id = project_id))]
     async fn configure_okta_addon(
         &self,
         ctx: &Context,
@@ -162,7 +159,6 @@ impl Addons for ControllerClient {
             .miette_success("configure okta addon")
     }
 
-    #[instrument(skip_all, fields(project_id = project_id))]
     async fn configure_influxdb_addon(
         &self,
         ctx: &Context,
@@ -174,7 +170,7 @@ impl Addons for ControllerClient {
         let req = Request::post(format!(
             "/v1/projects/{project_id}/configure_addon/influxdb_token_lease_manager"
         ))
-        .body(config);
+            .body(config);
         self.get_secure_client()
             .ask(ctx, API_SERVICE, req)
             .await
@@ -182,7 +178,6 @@ impl Addons for ControllerClient {
             .miette_success("configure influxdb addon")
     }
 
-    #[instrument(skip_all, fields(project_id = project_id, addon_id = addon_id))]
     async fn disable_addon(
         &self,
         ctx: &Context,

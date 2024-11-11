@@ -12,7 +12,6 @@ use crate::nodes::InMemoryNode;
 
 impl InMemoryNode {
     #[allow(clippy::too_many_arguments)]
-    #[instrument(skip_all)]
     pub async fn create_inlet(
         &self,
         ctx: &Context,

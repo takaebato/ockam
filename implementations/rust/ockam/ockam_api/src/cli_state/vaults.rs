@@ -27,7 +27,6 @@ impl CliState {
     /// If the path is not specified then:
     ///   - if this is the first vault then secrets are persisted in the main database
     ///   - if this is a new vault then secrets are persisted in $OCKAM_HOME/vault_name
-    #[instrument(skip_all, fields(vault_name = vault_name.clone()))]
     pub async fn create_named_vault(
         &self,
         vault_name: Option<String>,
@@ -75,7 +74,6 @@ impl CliState {
     }
 
     /// Delete an existing vault
-    #[instrument(skip_all, fields(vault_name = vault_name))]
     pub async fn delete_named_vault(&self, vault_name: &str) -> Result<()> {
         // first check that no identity is using the vault
         let identities_repository = self.identities_repository();
@@ -116,7 +114,6 @@ impl CliState {
     }
 
     /// Delete all named identities
-    #[instrument(skip_all)]
     pub async fn delete_all_named_identities(&self) -> Result<()> {
         let identities_repository = self.identities_repository();
         let identities = identities_repository.get_named_identities().await?;
@@ -135,7 +132,6 @@ impl CliState {
     }
 
     /// Delete all vaults and their files
-    #[instrument(skip_all)]
     pub async fn delete_all_named_vaults(&self) -> Result<()> {
         let vaults = self.vaults_repository().get_named_vaults().await?;
         for vault in vaults {
@@ -153,14 +149,12 @@ impl CliState {
 /// The methods below provide an API to query named vaults.
 impl CliState {
     /// Return all the named vaults
-    #[instrument(skip_all)]
     pub async fn get_named_vaults(&self) -> Result<Vec<NamedVault>> {
         Ok(self.vaults_repository().get_named_vaults().await?)
     }
 
     /// Return the vault with a given name
     /// and raise an error if the vault is not found
-    #[instrument(skip_all, fields(vault_name = vault_name))]
     pub async fn get_named_vault(&self, vault_name: &str) -> Result<NamedVault> {
         let result = self.vaults_repository().get_named_vault(vault_name).await?;
         Ok(result.ok_or_else(|| {
@@ -175,7 +169,6 @@ impl CliState {
     /// Return a vault if it already exists, otherwise
     /// Create a new vault using a default path: either the database path for the first vault
     /// or a path using the vault name
-    #[instrument(skip_all, fields(vault_name = vault_name))]
     pub async fn get_or_create_named_vault(&self, vault_name: &str) -> Result<NamedVault> {
         let vaults_repository = self.vaults_repository();
 
@@ -230,7 +223,6 @@ impl CliState {
     /// Return the existing vault if there is only one
     /// If it doesn't exist, the vault is created with the name 'default'
     /// If there are more than one vaults, return an error
-    #[instrument(skip_all)]
     pub async fn get_or_create_default_named_vault(&self) -> Result<NamedVault> {
         let vaults = self.vaults_repository().get_named_vaults().await?;
         match &vaults[..] {
@@ -249,7 +241,6 @@ impl CliState {
 
     /// Return either the default vault or a vault with the given name
     /// If the default vault is required and does not exist it is created.
-    #[instrument(skip_all, fields(vault_name = vault_name.clone()))]
     pub async fn get_named_vault_or_default(
         &self,
         vault_name: &Option<String>,
@@ -262,7 +253,6 @@ impl CliState {
 
     /// Move a vault file to another location if the vault is not the default vault
     /// contained in the main database
-    #[instrument(skip_all, fields(vault_name = vault_name, path = path.to_string_lossy().to_string()))]
     pub async fn move_vault(&self, vault_name: &str, path: &Path) -> Result<()> {
         let repository = self.vaults_repository();
         let vault = self.get_named_vault(vault_name).await?;
@@ -293,15 +283,14 @@ impl CliState {
     }
 
     /// Make a concrete vault based on the NamedVault metadata
-    #[instrument(skip_all, fields(vault_name = named_vault.name))]
     pub async fn make_vault(&self, named_vault: NamedVault) -> Result<Vault> {
         let db = match named_vault.vault_type {
             VaultType::DatabaseVault { .. } => self.database(),
             VaultType::LocalFileVault { ref path, .. } =>
             // TODO: Avoid creating multiple dbs with the same file
-            {
-                SqlxDatabase::create_sqlite(path.as_path()).await?
-            }
+                {
+                    SqlxDatabase::create_sqlite(path.as_path()).await?
+                }
         };
 
         if named_vault.vault_type.use_aws_kms() {
@@ -430,7 +419,7 @@ impl Display for VaultType {
             }
         )?;
         if self.use_aws_kms() {
-            writeln!(f, "Uses AWS KMS: true",)?;
+            writeln!(f, "Uses AWS KMS: true", )?;
         }
         Ok(())
     }
@@ -546,7 +535,7 @@ impl Output for NamedVault {
             }
         )?;
         if self.vault_type.use_aws_kms() {
-            writeln!(output, "Uses AWS KMS: true",)?;
+            writeln!(output, "Uses AWS KMS: true", )?;
         }
         Ok(output)
     }

@@ -23,7 +23,6 @@ pub(crate) const SIZE_OF_TAG: usize = 16;
 pub(crate) const SIZE_OF_ENCRYPT_OVERHEAD: usize = SIZE_OF_NONCE + SIZE_OF_TAG;
 
 impl Encryptor {
-    #[instrument(skip_all)]
     pub async fn rekey(
         vault: &Arc<dyn VaultForSecureChannels>,
         key: &AeadSecretKeyHandle,
@@ -48,7 +47,6 @@ impl Encryptor {
         vault.convert_secret_buffer_to_aead_key(buffer).await
     }
 
-    #[instrument(skip_all)]
     pub async fn encrypt(&mut self, destination: &mut Vec<u8>, payload: &[u8]) -> Result<()> {
         let current_nonce = self.nonce;
 
@@ -92,7 +90,6 @@ impl Encryptor {
         }
     }
 
-    #[instrument(skip_all)]
     pub(crate) async fn shutdown(&self) -> Result<()> {
         if !self.vault.delete_aead_secret_key(self.key.clone()).await? {
             Err(Error::new(
@@ -100,7 +97,7 @@ impl Encryptor {
                 Kind::Internal,
                 format!(
                     "the key id {} could not be deleted in the Encryptor shutdown",
-                    hex::encode(self.key.0 .0.value())
+                    hex::encode(self.key.0.0.value())
                 ),
             ))
         } else {

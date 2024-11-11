@@ -19,7 +19,6 @@ impl UdpTransport {
     /// let udp = UdpTransport::create(&ctx).await?;
     /// # Ok(()) }
     /// ```
-    #[instrument(name = "create udp transport", skip_all)]
     pub async fn create(ctx: &Context) -> Result<Self> {
         let udp = Self {
             ctx: Arc::new(ctx.async_try_clone().await?),

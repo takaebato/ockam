@@ -99,14 +99,13 @@ impl EnrollCommand {
     }
 
     // Creates one span in the trace
-    #[instrument(
-        skip_all, // Drop all args that passed in, as Context doesn't play nice
-        fields(
-        enroller = ? self.identity, // https://docs.rs/tracing/latest/tracing/
-        authorization_code_flow = % self.authorization_code_flow,
-        force = % self.force,
-        skip_orchestrator_resources_creation = % self.skip_orchestrator_resources_creation,
-        ))]
+    skip_all, // Drop all args that passed in, as Context doesn't play nice
+    fields(
+    enroller = ? self .identity, // https://docs.rs/tracing/latest/tracing/
+    authorization_code_flow = % self .authorization_code_flow,
+    force = % self .force,
+    skip_orchestrator_resources_creation = % self .skip_orchestrator_resources_creation,
+    ))]
     async fn run_impl(&self, ctx: &Context, opts: CommandGlobalOpts) -> miette::Result<()> {
         ctrlc_handler(opts.clone());
 
@@ -137,7 +136,7 @@ impl EnrollCommand {
             &node,
             self.skip_orchestrator_resources_creation,
         )
-        .await
+            .await
         {
             // Display output to user
             opts.terminal
@@ -302,18 +301,18 @@ fn display_header(opts: &CommandGlobalOpts) {
             OckamColor::OckamBlue.value(),
             OckamColor::HeaderGradient.value(),
         ]
-        .map(String::from),
+            .map(String::from),
     );
     let colored_header = ColorWheel::new(vec![ColorWheelConfig::Rgb(
         gradient_steps,
         ColorWheelSpeed::Medium,
         50,
     )])
-    .colorize_into_string(
-        &UnicodeString::from(ockam_header),
-        GradientGenerationPolicy::ReuseExistingGradientAndResetIndex,
-        TextColorizationPolicy::ColorEachCharacter(None),
-    );
+        .colorize_into_string(
+            &UnicodeString::from(ockam_header),
+            GradientGenerationPolicy::ReuseExistingGradientAndResetIndex,
+            TextColorizationPolicy::ColorEachCharacter(None),
+        );
 
     let _ = opts.terminal.write_line(format!("{}\n", colored_header));
 }
@@ -339,8 +338,6 @@ fn ctrlc_handler(opts: CommandGlobalOpts) {
     })
         .expect("Error setting Ctrl-C handler");
 }
-
-#[instrument(skip_all)]
 async fn retrieve_user_space_and_project(
     opts: &CommandGlobalOpts,
     ctx: &Context,
@@ -359,12 +356,12 @@ async fn retrieve_user_space_and_project(
         skip_orchestrator_resources_creation,
         &space,
     )
-    .await
-    .wrap_err(format!(
-        "Unable to retrieve and set a Project as default with Space {}",
-        color_primary(&space.name)
-    ))?
-    .ok_or(miette!("No Project was found"))?;
+        .await
+        .wrap_err(format!(
+            "Unable to retrieve and set a Project as default with Space {}",
+            color_primary(&space.name)
+        ))?
+        .ok_or(miette!("No Project was found"))?;
     opts.terminal.write_line(fmt_separator!())?;
     Ok(project)
 }

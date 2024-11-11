@@ -28,7 +28,6 @@ pub trait Messages {
 
 #[async_trait]
 impl Messages for NodeManager {
-    #[instrument(skip_all)]
     async fn send_message(
         &self,
         ctx: &Context,
@@ -60,7 +59,6 @@ impl Messages for NodeManager {
 
 #[async_trait]
 impl Messages for BackgroundNodeClient {
-    #[instrument(skip_all)]
     async fn send_message(
         &self,
         ctx: &Context,

@@ -32,7 +32,6 @@ pub struct CredentialIssuer {
 impl CredentialIssuer {
     /// Create a new credentials issuer
     #[allow(clippy::too_many_arguments)]
-    #[instrument(skip_all, fields(issuer = %issuer, project_identifier = project_identifier.clone(), credential_ttl = credential_ttl.map_or("n/a".to_string(), |d| d.as_secs().to_string())))]
     pub fn new(
         members: Arc<dyn AuthorityMembersRepository>,
         identities_attributes: Arc<IdentitiesAttributes>,
@@ -66,7 +65,6 @@ impl CredentialIssuer {
         }
     }
 
-    #[instrument(skip_all, fields(subject = %subject))]
     pub async fn issue_credential(
         &self,
         subject: &Identifier,

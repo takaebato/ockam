@@ -29,7 +29,6 @@ impl TcpTransport {
     /// # tcp.stop_inlet("inlet").await?;
     /// # Ok(()) }
     /// ```
-    #[instrument(skip(self), fields(address = ? bind_addr.clone().into(), outlet_route = ? outlet_route.clone()))]
     pub async fn create_inlet(
         &self,
         bind_addr: impl Into<String> + Clone + Debug,
@@ -44,7 +43,7 @@ impl TcpTransport {
             socket_address,
             options,
         )
-        .await
+            .await
     }
 
     /// Stop inlet at addr
@@ -61,7 +60,6 @@ impl TcpTransport {
     /// tcp.stop_inlet("inlet").await?;
     /// # Ok(()) }
     /// ```
-    #[instrument(skip(self), fields(address = ? addr.clone().into()))]
     pub async fn stop_inlet(&self, addr: impl Into<Address> + Clone + Debug) -> Result<()> {
         self.ctx.stop_processor(addr).await?;
 
@@ -87,7 +85,6 @@ impl TcpTransport {
     /// # tcp.stop_outlet("outlet").await?;
     /// # Ok(()) }
     /// ```
-    #[instrument(skip(self), fields(address = ? address.clone().into(), peer=peer.clone().to_string()))]
     pub async fn create_outlet(
         &self,
         address: impl Into<Address> + Clone + Debug,
@@ -101,7 +98,7 @@ impl TcpTransport {
             peer,
             options,
         )
-        .await?;
+            .await?;
 
         Ok(())
     }
@@ -120,7 +117,6 @@ impl TcpTransport {
     /// tcp.stop_outlet("outlet").await?;
     /// # Ok(()) }
     /// ```
-    #[instrument(skip(self), fields(address = % addr.clone().into()))]
     pub async fn stop_outlet(&self, addr: impl Into<Address> + Clone + Debug) -> Result<()> {
         self.ctx.stop_worker(addr).await?;
         Ok(())

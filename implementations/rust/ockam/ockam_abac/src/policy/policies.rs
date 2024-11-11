@@ -28,7 +28,6 @@ impl Policies {
         }
     }
 
-    #[instrument(skip_all, fields(resource = %resource, action = %action, env = %env, authority = ?authority))]
     pub fn make_policy_access_control(
         &self,
         identities_attributes: Arc<IdentitiesAttributes>,

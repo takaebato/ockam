@@ -19,7 +19,6 @@ impl TcpTransport {
     /// let tcp = TcpTransport::create(&ctx).await?;
     /// # Ok(()) }
     /// ```
-    #[instrument(name = "create tcp transport", skip_all)]
     pub async fn create(ctx: &Context) -> Result<Self> {
         let tcp = Self::new(ctx.async_try_clone().await?);
         // make the TCP transport available in the list of supported transports for

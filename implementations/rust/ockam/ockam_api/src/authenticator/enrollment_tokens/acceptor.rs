@@ -27,7 +27,6 @@ impl EnrollmentTokenAcceptor {
         Self { tokens, members }
     }
 
-    #[instrument(skip_all, fields(from = %from))]
     pub async fn accept_token(
         &mut self,
         otc: OneTimeCode,

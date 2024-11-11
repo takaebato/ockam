@@ -54,7 +54,6 @@ impl TcpTransport {
     }
 
     /// Create a Raw Inlet
-    #[instrument(skip(self), fields(outlet_route=?outlet_route.clone()))]
     pub async fn create_raw_inlet(
         &self,
         bind_addr: impl Into<String> + Clone + Debug,
@@ -159,7 +158,6 @@ impl TcpTransport {
     }
 
     /// Stop the Raw Inlet
-    #[instrument(skip(self), fields(port=port))]
     pub async fn stop_raw_inlet(&self, port: Port) -> Result<()> {
         self.ebpf_support.inlet_registry.delete_inlet(port);
 
@@ -167,7 +165,6 @@ impl TcpTransport {
     }
 
     /// Create a Raw Outlet
-    #[instrument(skip(self), fields(address = ? address.clone().into(), peer=peer.clone().to_string()))]
     pub async fn create_raw_outlet(
         &self,
         address: impl Into<Address> + Clone + Debug,
@@ -239,7 +236,6 @@ impl TcpTransport {
     }
 
     /// Stop the Raw Inlet
-    #[instrument(skip(self), fields(address = % addr.clone().into()))]
     pub async fn stop_raw_outlet(&self, addr: impl Into<Address> + Clone + Debug) -> Result<()> {
         self.ctx().stop_worker(addr).await?;
 

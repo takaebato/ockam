@@ -46,10 +46,10 @@ impl Space {
     pub fn is_in_free_trial_subscription(&self) -> bool {
         self.subscription.is_none()
             || self
-                .subscription
-                .as_ref()
-                .map(|s| s.is_free_trial)
-                .unwrap_or_default()
+            .subscription
+            .as_ref()
+            .map(|s| s.is_free_trial)
+            .unwrap_or_default()
     }
 
     pub fn subscription_status_message(&self, space_is_new: bool) -> crate::Result<String> {
@@ -184,7 +184,6 @@ pub trait Spaces {
 
 #[async_trait]
 impl Spaces for InMemoryNode {
-    #[instrument(skip_all, fields(space_name = name))]
     async fn create_space(
         &self,
         ctx: &Context,
@@ -204,7 +203,6 @@ impl Spaces for InMemoryNode {
         Ok(space)
     }
 
-    #[instrument(skip_all, fields(space_id = space_id))]
     async fn get_space(&self, ctx: &Context, space_id: &str) -> miette::Result<Space> {
         let controller = self.create_controller().await?;
         let space = controller.get_space(ctx, space_id).await?;
@@ -219,7 +217,6 @@ impl Spaces for InMemoryNode {
         Ok(space)
     }
 
-    #[instrument(skip_all, fields(space_name = space_name))]
     async fn get_space_by_name(&self, ctx: &Context, space_name: &str) -> miette::Result<Space> {
         let space_id = self
             .cli_state
@@ -229,7 +226,6 @@ impl Spaces for InMemoryNode {
         self.get_space(ctx, &space_id).await
     }
 
-    #[instrument(skip_all, fields(space_id = space_id))]
     async fn delete_space(&self, ctx: &Context, space_id: &str) -> miette::Result<()> {
         let space_projects = self
             .cli_state
@@ -250,7 +246,6 @@ impl Spaces for InMemoryNode {
         Ok(())
     }
 
-    #[instrument(skip_all, fields(space_name = space_name))]
     async fn delete_space_by_name(&self, ctx: &Context, space_name: &str) -> miette::Result<()> {
         let space_id = self
             .cli_state
@@ -260,7 +255,6 @@ impl Spaces for InMemoryNode {
         self.delete_space(ctx, &space_id).await
     }
 
-    #[instrument(skip_all)]
     async fn get_spaces(&self, ctx: &Context) -> miette::Result<Vec<Space>> {
         let controller = self.create_controller().await?;
         let spaces = controller.list_spaces(ctx).await?;

@@ -243,7 +243,6 @@ pub trait Subscriptions {
 
 #[async_trait]
 impl Subscriptions for ControllerClient {
-    #[instrument(skip_all, fields(space_id = space_id, subscription_data = subscription_data))]
     async fn activate_subscription(
         &self,
         ctx: &Context,
@@ -256,7 +255,6 @@ impl Subscriptions for ControllerClient {
         self.get_secure_client().ask(ctx, API_SERVICE, req).await
     }
 
-    #[instrument(skip_all, fields(subscription_id = subscription_id))]
     async fn unsubscribe(
         &self,
         ctx: &Context,
@@ -267,7 +265,6 @@ impl Subscriptions for ControllerClient {
         self.get_secure_client().ask(ctx, API_SERVICE, req).await
     }
 
-    #[instrument(skip_all, fields(subscription_id = subscription_id, contact_info = contact_info))]
     async fn update_subscription_contact_info(
         &self,
         ctx: &Context,
@@ -279,7 +276,6 @@ impl Subscriptions for ControllerClient {
         self.get_secure_client().ask(ctx, API_SERVICE, req).await
     }
 
-    #[instrument(skip_all, fields(subscription_id = subscription_id, new_space_id = new_space_id))]
     async fn update_subscription_space(
         &self,
         ctx: &Context,
@@ -291,14 +287,12 @@ impl Subscriptions for ControllerClient {
         self.get_secure_client().ask(ctx, API_SERVICE, req).await
     }
 
-    #[instrument(skip_all)]
     async fn get_subscriptions(&self, ctx: &Context) -> Result<Reply<Vec<SubscriptionLegacy>>> {
         trace!(target: TARGET, "listing subscriptions");
         let req = Request::get("/v0/");
         self.get_secure_client().ask(ctx, API_SERVICE, req).await
     }
 
-    #[instrument(skip_all, fields(subscription_id = subscription_id))]
     async fn get_subscription(
         &self,
         ctx: &Context,
@@ -309,7 +303,6 @@ impl Subscriptions for ControllerClient {
         self.get_secure_client().ask(ctx, API_SERVICE, req).await
     }
 
-    #[instrument(skip_all, fields(space_id = space_id))]
     async fn get_subscription_by_space_id(
         &self,
         ctx: &Context,

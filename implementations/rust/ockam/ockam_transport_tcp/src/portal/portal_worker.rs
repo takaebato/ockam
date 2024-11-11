@@ -66,7 +66,6 @@ pub(crate) enum WriteHalfMaybeTls {
 
 impl TcpPortalWorker {
     /// Start a new `TcpPortalWorker` of type [`TypeName::Inlet`]
-    #[instrument(skip_all)]
     #[allow(clippy::too_many_arguments)]
     pub(super) async fn start_new_inlet(
         ctx: &Context,
@@ -91,12 +90,11 @@ impl TcpPortalWorker {
             incoming_access_control,
             outgoing_access_control,
         )
-        .await
+            .await
     }
 
     /// Start a new `TcpPortalWorker` of type [`TypeName::Outlet`]
     #[allow(clippy::too_many_arguments)]
-    #[instrument(skip_all)]
     pub(super) async fn start_new_outlet(
         ctx: &Context,
         registry: TcpRegistry,
@@ -120,12 +118,11 @@ impl TcpPortalWorker {
             incoming_access_control,
             outgoing_access_control,
         )
-        .await
+            .await
     }
 
     /// Start a new `TcpPortalWorker`
     #[allow(clippy::too_many_arguments)]
-    #[instrument(skip_all)]
     async fn start(
         ctx: &Context,
         registry: TcpRegistry,
@@ -210,7 +207,6 @@ impl TcpPortalWorker {
     }
 
     /// Start a `TcpPortalRecvProcessor`
-    #[instrument(skip_all)]
     async fn start_receiver(&mut self, ctx: &Context, onward_route: Route) -> Result<()> {
         if let Some(rx) = self.read_half.take() {
             match rx {
@@ -256,7 +252,6 @@ impl TcpPortalWorker {
         Ok(())
     }
 
-    #[instrument(skip_all)]
     async fn notify_remote_about_disconnection(&mut self, ctx: &Context) -> Result<()> {
         // Notify the other end
         if let Some(remote_route) = self.remote_route.take() {
@@ -265,7 +260,7 @@ impl TcpPortalWorker {
                 PortalMessage::Disconnect.to_neutral_message()?,
                 self.addresses.sender_remote.clone(),
             )
-            .await?;
+                .await?;
 
             debug!(
                 "Notified the other side from {:?} at: {} about connection drop",
@@ -277,7 +272,6 @@ impl TcpPortalWorker {
         Ok(())
     }
 
-    #[instrument(skip_all)]
     async fn stop_receiver(&self, ctx: &Context) -> Result<()> {
         if ctx
             .stop_processor(self.addresses.receiver_remote.clone())
@@ -294,14 +288,12 @@ impl TcpPortalWorker {
         Ok(())
     }
 
-    #[instrument(skip_all)]
     async fn stop_sender(&self, ctx: &Context) -> Result<()> {
         ctx.stop_worker(self.addresses.sender_internal.clone())
             .await
     }
 
     /// Start the portal disconnection process
-    #[instrument(skip_all)]
     async fn start_disconnection(
         &mut self,
         ctx: &Context,
@@ -356,7 +348,6 @@ impl TcpPortalWorker {
         Ok(())
     }
 
-    #[instrument(skip_all)]
     async fn handle_send_ping(&self, ctx: &Context, ping_route: Route) -> Result<State> {
         // Force creation of Outlet on the other side
         ctx.send_from_address(
@@ -364,14 +355,13 @@ impl TcpPortalWorker {
             PortalMessage::Ping.to_neutral_message()?,
             self.addresses.sender_remote.clone(),
         )
-        .await?;
+            .await?;
 
         debug!("Inlet at: {} sent ping", self.addresses.sender_internal);
 
         Ok(State::ReceivePong)
     }
 
-    #[instrument(skip_all)]
     async fn handle_send_pong(&mut self, ctx: &Context, pong_route: Route) -> Result<State> {
         if self.write_half.is_some() {
             // Should not happen
@@ -397,7 +387,7 @@ impl TcpPortalWorker {
             PortalMessage::Pong.to_neutral_message()?,
             self.addresses.sender_remote.clone(),
         )
-        .await?;
+            .await?;
 
         self.start_receiver(ctx, pong_route.clone()).await?;
 
@@ -418,7 +408,6 @@ impl Worker for TcpPortalWorker {
     type Context = Context;
     type Message = Any;
 
-    #[instrument(skip_all, name = "TcpPortalWorker::initialize")]
     async fn initialize(&mut self, ctx: &mut Self::Context) -> Result<()> {
         let state = self.clone_state();
 
@@ -440,7 +429,6 @@ impl Worker for TcpPortalWorker {
         Ok(())
     }
 
-    #[instrument(skip_all, name = "TcpPortalWorker::shutdown")]
     async fn shutdown(&mut self, _ctx: &mut Self::Context) -> Result<()> {
         self.registry
             .remove_portal_worker(&self.addresses.sender_remote);
@@ -450,7 +438,6 @@ impl Worker for TcpPortalWorker {
 
     // TcpSendWorker will receive messages from the TcpRouter to send
     // across the TcpStream to our friend
-    #[instrument(skip_all, name = "TcpPortalWorker::handle_message")]
     async fn handle_message(&mut self, ctx: &mut Context, msg: Routed<Any>) -> Result<()> {
         if self.is_disconnecting {
             return Ok(());
@@ -533,7 +520,6 @@ impl Worker for TcpPortalWorker {
 }
 
 impl TcpPortalWorker {
-    #[instrument(skip_all)]
     async fn handle_receive_pong(&mut self, ctx: &Context, return_route: Route) -> Result<()> {
         self.start_receiver(ctx, return_route.clone()).await?;
         debug!("Inlet at: {} received pong", self.addresses.sender_internal);
@@ -542,7 +528,6 @@ impl TcpPortalWorker {
         Ok(())
     }
 
-    #[instrument(skip_all)]
     async fn handle_disconnect(&mut self, ctx: &Context) -> Result<()> {
         info!(
             "Tcp stream was dropped for {:?} at: {}",
@@ -553,7 +538,6 @@ impl TcpPortalWorker {
             .await
     }
 
-    #[instrument(skip_all)]
     async fn handle_payload(
         &mut self,
         ctx: &Context,
@@ -584,7 +568,6 @@ impl TcpPortalWorker {
         Ok(())
     }
 
-    #[instrument(skip_all)]
     async fn check_packet_counter(
         &mut self,
         ctx: &Context,

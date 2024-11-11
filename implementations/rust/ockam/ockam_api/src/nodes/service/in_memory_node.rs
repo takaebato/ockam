@@ -96,7 +96,7 @@ impl InMemoryNode {
             None,
             None,
         )
-        .await
+            .await
     }
 
     /// Start an in memory node with some identity and project
@@ -121,7 +121,6 @@ impl InMemoryNode {
     }
 
     /// Start an in memory node
-    #[instrument(name = "start in-memory node", skip_all)]
     pub async fn start_node(
         ctx: &Context,
         cli_state: &CliState,
@@ -169,8 +168,8 @@ impl InMemoryNode {
             NodeManagerTransportOptions::new(tcp_listener.flow_control_id().clone(), tcp, None),
             trust_options,
         )
-        .await
-        .into_diagnostic()?;
+            .await
+            .into_diagnostic()?;
         ctx.flow_controls()
             .add_consumer(NODEMANAGER_ADDR, tcp_listener.flow_control_id());
         Ok(node_manager)
@@ -206,7 +205,6 @@ impl InMemoryNode {
     }
 
     /// Create a new in memory node with various options
-    #[instrument(name = "new in-memory node", skip_all, fields(node_name = general_options.node_name))]
     pub async fn new(
         ctx: &Context,
         general_options: NodeManagerGeneralOptions,

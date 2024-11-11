@@ -73,7 +73,6 @@ impl DirectAuthenticator {
         }
     }
 
-    #[instrument(skip_all, fields(enroller = %enroller, identifier = %identifier))]
     pub async fn add_member(
         &self,
         enroller: &Identifier,
@@ -86,7 +85,7 @@ impl DirectAuthenticator {
             enroller,
             &self.account_authority,
         )
-        .await?;
+            .await?;
 
         if !check.is_enroller {
             warn!(
@@ -137,7 +136,6 @@ impl DirectAuthenticator {
         Ok(Either::Left(()))
     }
 
-    #[instrument(skip_all, fields(enroller = %enroller))]
     pub async fn show_member(
         &self,
         enroller: &Identifier,
@@ -149,7 +147,7 @@ impl DirectAuthenticator {
             enroller,
             &self.account_authority,
         )
-        .await?;
+            .await?;
 
         if !check.is_enroller {
             warn!("Non-enroller {} is trying to retrieve a member", enroller);
@@ -178,7 +176,6 @@ impl DirectAuthenticator {
         }
     }
 
-    #[instrument(skip_all, fields(enroller = %enroller))]
     pub async fn list_members(
         &self,
         enroller: &Identifier,
@@ -189,7 +186,7 @@ impl DirectAuthenticator {
             enroller,
             &self.account_authority,
         )
-        .await?;
+            .await?;
 
         if !check.is_enroller {
             warn!("Non-enroller {} is trying to list members", enroller);
@@ -214,7 +211,6 @@ impl DirectAuthenticator {
         Ok(Either::Left(res))
     }
 
-    #[instrument(skip_all, fields(enroller = %enroller))]
     pub async fn delete_all_members(
         &self,
         enroller: &Identifier,
@@ -232,7 +228,6 @@ impl DirectAuthenticator {
         }
     }
 
-    #[instrument(skip_all, fields(enroller = %enroller, identifier = %identifier))]
     pub async fn delete_member(
         &self,
         enroller: &Identifier,
@@ -244,7 +239,7 @@ impl DirectAuthenticator {
             enroller,
             &self.account_authority,
         )
-        .await?;
+            .await?;
 
         if !check_enroller.is_enroller {
             warn!(
@@ -262,7 +257,7 @@ impl DirectAuthenticator {
             identifier,
             &self.account_authority,
         )
-        .await?;
+            .await?;
 
         if check_member.is_pre_trusted {
             warn!(

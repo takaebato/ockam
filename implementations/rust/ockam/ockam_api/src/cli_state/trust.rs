@@ -130,7 +130,7 @@ impl CliState {
             scope: CredentialScope::ProjectMember {
                 project_id: project_id.clone(),
             }
-            .to_string(),
+                .to_string(),
         };
 
         let controller_identifier = NodeManager::load_controller_identifier()?;
@@ -145,7 +145,7 @@ impl CliState {
             scope: CredentialScope::ProjectAdmin {
                 project_id: project_id.clone(),
             }
-            .to_string(),
+                .to_string(),
         };
 
         let account_admin_retriever = NodeManagerCredentialRetrieverOptions::Remote {
@@ -158,7 +158,7 @@ impl CliState {
                 //  yet anywhere
                 account_id: project_id.clone(),
             }
-            .to_string(),
+                .to_string(),
         };
 
         let trust_options = NodeManagerTrustOptions::new(
@@ -179,7 +179,6 @@ impl CliState {
     ///  1. Either we explicitly know the Authority identity that we trust, and optionally route to its node to request
     ///     a new credential
     ///  2. Or we know the project name (or have default one) that contains identity and route to the Authority node
-    #[instrument(skip_all, fields(project_name = project_name.clone(), authority_identity = authority_identity.as_ref().map(|a| a.to_string()).unwrap_or("n/a".to_string()), authority_route = authority_route.clone().map_or("n/a".to_string(), |r| r.to_string())))]
     pub async fn retrieve_trust_options(
         &self,
         project_name: &Option<String>,

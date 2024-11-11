@@ -55,8 +55,8 @@ impl NodeManagerWorker {
                     policy_expression.clone(),
                     token,
                 )
-                .await
-                .map_err(|e| Response::bad_request_no_request(&format!("{e:?}")))?;
+                    .await
+                    .map_err(|e| Response::bad_request_no_request(&format!("{e:?}")))?;
                 outlet_addr
             }
             InfluxDBOutletConfig::StartLeaseManager(lease_manager_config) => {
@@ -241,7 +241,7 @@ impl NodeManagerWorker {
             Arc::new(policy_access_control.create_outgoing(ctx).await?),
             Arc::new(policy_access_control.create_incoming()),
         )
-        .await?;
+            .await?;
 
         // every secure channel can reach this service
         let flow_controls = ctx.flow_controls();
@@ -289,7 +289,7 @@ impl NodeManagerWorker {
             Arc::new(policy_access_control.create_incoming()),
             Arc::new(policy_access_control.create_outgoing(ctx).await?),
         )
-        .await?;
+            .await?;
         Ok(interceptor_address)
     }
 }
@@ -329,7 +329,6 @@ pub trait InfluxDBPortals {
 
 #[async_trait]
 impl InfluxDBPortals for BackgroundNodeClient {
-    #[instrument(skip(self, ctx))]
     #[allow(clippy::too_many_arguments)]
     async fn create_influxdb_outlet(
         &self,
@@ -349,7 +348,6 @@ impl InfluxDBPortals for BackgroundNodeClient {
         self.ask(ctx, req).await
     }
 
-    #[instrument(skip(self, ctx))]
     #[allow(clippy::too_many_arguments)]
     async fn create_influxdb_inlet(
         &self,

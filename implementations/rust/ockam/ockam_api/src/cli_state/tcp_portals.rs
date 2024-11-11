@@ -10,7 +10,6 @@ use std::net::SocketAddr;
 
 impl CliState {
     /// Create a TCP inlet
-    #[instrument(skip_all)]
     pub async fn create_tcp_inlet(
         &self,
         node_name: &str,
@@ -26,7 +25,6 @@ impl CliState {
     }
 
     /// Get a TCP inlet by node name and alias
-    #[instrument(skip_all)]
     pub async fn get_tcp_inlet(&self, node_name: &str, alias: &str) -> Result<TcpInlet> {
         Ok(self
             .tcp_portals_repository()
@@ -40,7 +38,6 @@ impl CliState {
     }
 
     /// Delete a TCP inlet
-    #[instrument(skip_all)]
     pub async fn delete_tcp_inlet(&self, node_name: &str, alias: &str) -> Result<()> {
         Ok(self
             .tcp_portals_repository()
@@ -49,7 +46,6 @@ impl CliState {
     }
 
     /// Create a TCP outlet
-    #[instrument(skip_all)]
     pub async fn create_tcp_outlet(
         &self,
         node_name: &str,
@@ -66,7 +62,6 @@ impl CliState {
     }
 
     /// Delete a TCP outlet
-    #[instrument(skip_all)]
     pub async fn delete_tcp_outlet(&self, node_name: &str, worker_addr: &Address) -> Result<()> {
         Ok(self
             .tcp_portals_repository()

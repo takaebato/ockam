@@ -35,7 +35,6 @@ pub struct CreateCommand {
 impl Command for CreateCommand {
     const NAME: &'static str = "rendezvous create";
 
-    #[instrument(skip_all)]
     fn run(self, opts: CommandGlobalOpts) -> miette::Result<()> {
         local_cmd(embedded_node_that_is_not_stopped(
             opts.rt.clone(),

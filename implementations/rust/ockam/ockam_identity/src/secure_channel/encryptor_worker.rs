@@ -114,7 +114,6 @@ impl EncryptorWorker {
         }
     }
 
-    #[instrument(skip_all)]
     async fn handle_encrypt_api(
         &mut self,
         ctx: &mut <Self as Worker>::Context,
@@ -163,7 +162,6 @@ impl EncryptorWorker {
         Ok(())
     }
 
-    #[instrument(skip_all)]
     async fn handle_encrypt(
         &mut self,
         ctx: &mut <Self as Worker>::Context,
@@ -207,7 +205,6 @@ impl EncryptorWorker {
 
     /// Asks credential retriever for a new credential and presents it to the other side, including
     /// the latest change_history
-    #[instrument(skip_all)]
     async fn handle_refresh_credentials(&mut self, ctx: &<Self as Worker>::Context) -> Result<()> {
         debug!(
             "Started credentials refresh for {}",
@@ -275,7 +272,7 @@ impl EncryptorWorker {
             NeutralMessage::from(msg),
             self.addresses.encryptor.clone(),
         )
-        .await?;
+            .await?;
 
         self.last_presented_credential = Some(credential);
 
@@ -296,7 +293,7 @@ impl EncryptorWorker {
             NeutralMessage::from(msg),
             self.addresses.encryptor.clone(),
         )
-        .await?;
+            .await?;
 
         Ok(())
     }
@@ -328,7 +325,6 @@ impl Worker for EncryptorWorker {
         Ok(())
     }
 
-    #[instrument(skip_all, name = "EncryptorWorker::handle_message", fields(worker = % ctx.address()))]
     async fn handle_message(
         &mut self,
         ctx: &mut Self::Context,
@@ -355,7 +351,6 @@ impl Worker for EncryptorWorker {
         Ok(())
     }
 
-    #[instrument(skip_all, name = "EncryptorWorker::shutdown")]
     async fn shutdown(&mut self, context: &mut Self::Context) -> Result<()> {
         if let Some(credential_retriever) = &self.credential_retriever {
             credential_retriever.unsubscribe(&self.addresses.encryptor_internal)?;

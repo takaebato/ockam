@@ -13,8 +13,6 @@ use tokio_rustls::rustls::{ClientConfig, RootCertStore};
 use tokio_rustls::{TlsConnector, TlsStream};
 use tracing::{debug, instrument};
 
-/// Connect to a socket address via a regular TcpStream
-#[instrument(skip_all)]
 pub(crate) async fn connect(to: &HostnamePort) -> Result<(OwnedReadHalf, OwnedWriteHalf)> {
     Ok(create_tcp_stream(to).await?.into_split())
 }
@@ -52,8 +50,6 @@ pub(crate) async fn create_tcp_stream(to: &HostnamePort) -> Result<TcpStream> {
 }
 
 /// Connect to a socket address via a TlsStream
-#[allow(clippy::type_complexity)]
-#[instrument(skip_all)]
 pub(crate) async fn connect_tls(
     to: &HostnamePort,
 ) -> Result<(

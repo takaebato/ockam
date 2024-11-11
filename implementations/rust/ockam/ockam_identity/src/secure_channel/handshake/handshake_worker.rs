@@ -163,7 +163,7 @@ impl HandshakeWorker {
                     trust_policy,
                     authority.clone(),
                 )
-                .await?,
+                    .await?,
             )
         } else {
             Box::new(
@@ -176,7 +176,7 @@ impl HandshakeWorker {
                     trust_policy,
                     authority.clone(),
                 )
-                .await?,
+                    .await?,
             )
         };
 
@@ -258,7 +258,6 @@ impl HandshakeWorker {
     ///   - one for decryption
     ///
     /// See also the handle_decrypt method.
-    #[instrument(skip_all, name = "HandshakeWorker::handle_message")]
     async fn handle_handshake(
         &mut self,
         context: &mut Context,
@@ -312,7 +311,6 @@ impl HandshakeWorker {
     ///
     /// In reality, there's only one worker, the HandshakeWorker, serves as both a worker for handshakes
     /// and for decryption.
-    #[instrument(skip_all, name = "DecryptorWorker::handle_message")]
     async fn handle_decrypt(&mut self, context: &mut Context, message: Routed<Any>) -> Result<()> {
         let decryptor_handler = self.decryptor_handler.as_mut().unwrap();
         let msg_addr = message.msg_addr();
@@ -456,7 +454,7 @@ impl HandshakeWorker {
             their_identifier,
             &handshake_results.handshake_keys.decryption_key,
         )
-        .await;
+            .await;
 
         info!(
             "Initialized SecureChannel {} at local: {}, remote: {}",

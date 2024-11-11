@@ -64,7 +64,6 @@ impl DecryptorHandler {
         }
     }
 
-    #[instrument(skip_all)]
     pub(crate) async fn handle_decrypt_api(
         &mut self,
         ctx: &mut Context,
@@ -172,7 +171,7 @@ impl DecryptorHandler {
             msg.credentials,
             None,
         )
-        .await?;
+            .await?;
 
         info!(
             "Successfully handled credentials refresh for {}",
@@ -182,7 +181,6 @@ impl DecryptorHandler {
         Ok(())
     }
 
-    #[instrument(skip_all)]
     pub(crate) async fn handle_decrypt(
         &mut self,
         ctx: &mut Context,
@@ -247,7 +245,6 @@ impl Decryptor {
         }
     }
 
-    #[instrument(skip_all)]
     pub async fn decrypt(&mut self, payload: &[u8]) -> Result<(Vec<u8>, Nonce)> {
         if payload.len() < 8 {
             return Err(IdentityError::InvalidNonce)?;
@@ -291,7 +288,6 @@ impl Decryptor {
     }
 
     /// Remove the channel keys on shutdown
-    #[instrument(skip_all)]
     pub(crate) async fn shutdown(&self) -> Result<()> {
         self.vault
             .delete_aead_secret_key(self.key_tracker.current_key.clone())

@@ -11,7 +11,6 @@ impl NodeManagerWorker {
         Ok(Response::ok().body(inlets))
     }
 
-    #[instrument(skip_all)]
     pub(crate) async fn create_inlet(
         &self,
         ctx: &Context,

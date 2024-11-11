@@ -63,7 +63,6 @@ pub struct NodeManager {
 
 impl NodeManager {
     /// Create a new NodeManager with the node name from the ockam CLI
-    #[instrument(name = "create_node_manager", skip_all, fields(node_name = general_options.node_name))]
     pub async fn create(
         ctx: &Context,
         general_options: NodeManagerGeneralOptions,
@@ -185,7 +184,7 @@ impl NodeManager {
                 rendezvous_route,
                 options,
             )
-            .await?;
+                .await?;
 
             if let Some(api_sc_listener) = &s.api_sc_listener {
                 ctx.flow_controls().add_consumer(
@@ -392,7 +391,6 @@ impl NodeManager {
 
     /// Wait until the project is ready to be used
     /// At this stage the project authority node must be up and running
-    #[instrument(skip_all, fields(project_id = project.project_id()))]
     pub async fn wait_until_project_is_ready(
         &self,
         ctx: &Context,
@@ -450,8 +448,8 @@ impl NodeManager {
             &caller_identifier,
             credential_retriever_creator,
         )
-        .await
-        .into_diagnostic()
+            .await
+            .into_diagnostic()
     }
 
     pub async fn create_authority_client_with_authority(
@@ -472,8 +470,8 @@ impl NodeManager {
             &caller_identifier,
             None,
         )
-        .await
-        .into_diagnostic()
+            .await
+            .into_diagnostic()
     }
 
     /// Return a Controller client to send requests to the Controller
@@ -489,8 +487,8 @@ impl NodeManager {
             self.secure_channels.clone(),
             &self.identifier(),
         )
-        .await
-        .into_diagnostic()
+            .await
+            .into_diagnostic()
     }
 
     pub async fn create_project_client(
@@ -509,8 +507,8 @@ impl NodeManager {
                 .into_diagnostic()?,
             credentials_enabled,
         )
-        .await
-        .into_diagnostic()
+            .await
+            .into_diagnostic()
     }
 
     pub(crate) async fn access_control(

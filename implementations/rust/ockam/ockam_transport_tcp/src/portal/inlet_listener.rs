@@ -47,7 +47,6 @@ impl TcpInletListenProcessor {
     }
 
     /// Start a new `TcpInletListenProcessor`
-    #[instrument(skip_all, name = "TcpInletListenProcessor::start")]
     pub(crate) async fn start(
         ctx: &Context,
         registry: TcpRegistry,
@@ -160,14 +159,12 @@ const DEFAULT_TIMEOUT: Duration = Duration::from_secs(2 * 60);
 impl Processor for TcpInletListenProcessor {
     type Context = Context;
 
-    #[instrument(skip_all, name = "TcpInletListenProcessor::initialize")]
     async fn initialize(&mut self, ctx: &mut Self::Context) -> Result<()> {
         self.registry.add_inlet_listener_processor(&ctx.address());
 
         Ok(())
     }
 
-    #[instrument(skip_all, name = "TcpInletListenProcessor::shutdown")]
     async fn shutdown(&mut self, ctx: &mut Self::Context) -> Result<()> {
         self.registry
             .remove_inlet_listener_processor(&ctx.address());
@@ -175,7 +172,6 @@ impl Processor for TcpInletListenProcessor {
         Ok(())
     }
 
-    #[instrument(skip_all, name = "TcpInletListenProcessor::process")]
     async fn process(&mut self, ctx: &mut Self::Context) -> Result<bool> {
         let (stream, socket_addr) = self.inner.accept().await.map_err(TransportError::from)?;
 
@@ -227,7 +223,7 @@ impl Processor for TcpInletListenProcessor {
             self.options.incoming_access_control.clone(),
             self.options.outgoing_access_control.clone(),
         )
-        .await?;
+            .await?;
 
         Ok(true)
     }

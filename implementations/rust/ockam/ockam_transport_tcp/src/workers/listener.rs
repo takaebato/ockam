@@ -20,7 +20,6 @@ pub(crate) struct TcpListenProcessor {
 }
 
 impl TcpListenProcessor {
-    #[instrument(skip_all, name = "TcpListenProcessor::start")]
     pub(crate) async fn start(
         ctx: &Context,
         registry: TcpRegistry,
@@ -53,7 +52,6 @@ impl TcpListenProcessor {
 impl Processor for TcpListenProcessor {
     type Context = Context;
 
-    #[instrument(skip_all, name = "TcpListenProcessor::initialize")]
     async fn initialize(&mut self, ctx: &mut Context) -> Result<()> {
         ctx.set_cluster(crate::CLUSTER_NAME).await?;
 
@@ -66,14 +64,12 @@ impl Processor for TcpListenProcessor {
         Ok(())
     }
 
-    #[instrument(skip_all, name = "TcpListenProcessor::shutdown")]
     async fn shutdown(&mut self, ctx: &mut Self::Context) -> Result<()> {
         self.registry.remove_listener_processor(&ctx.address());
 
         Ok(())
     }
 
-    #[instrument(skip_all, name = "TcpListenProcessor::process")]
     async fn process(&mut self, ctx: &mut Self::Context) -> Result<bool> {
         debug!("Waiting for incoming TCP connection...");
 
@@ -105,7 +101,7 @@ impl Processor for TcpListenProcessor {
             mode,
             &receiver_flow_control_id,
         )
-        .await?;
+            .await?;
 
         // Processor to receive messages over the wire and forward them to the node
         TcpRecvProcessor::start(
@@ -118,7 +114,7 @@ impl Processor for TcpListenProcessor {
             &receiver_flow_control_id,
             receiver_outgoing_access_control,
         )
-        .await?;
+            .await?;
 
         Ok(true)
     }

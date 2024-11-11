@@ -31,7 +31,6 @@ impl NodeManagerWorker {
 impl NodeManagerWorker {
     //////// Request matching and response handling ////////
 
-    #[instrument(skip_all, fields(method = ?req.method(), path = req.path()))]
     async fn handle_request(
         &mut self,
         ctx: &mut Context,

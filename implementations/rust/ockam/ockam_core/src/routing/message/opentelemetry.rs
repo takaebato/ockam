@@ -64,13 +64,11 @@ impl OpenTelemetryContext {
     /// Return the current OpenTelemetryContext
     pub fn current() -> OpenTelemetryContext {
         // In order to get the current OpenTelemetry context that is connected to the
-        // current span, as instrumented with the #[instrument] attribute, we need to:
         //
         //   1. Create a temporary span.
         //   2. Get its data, given its id, from the global registry.
         //   3. In the span extensions we can find the OpenTelemetry context that is used to attribute span ids.
         //      That context contains the span id of the latest span created with OpenTelemetry.
-        //      That span is not the dummy span created below but the latest span created with #[instrument] in the
         //      current call stack.
         //      Note that opentelemetry::Context::current() would return a Context which only contains the latest context
         //      created with `tracer::in_span(...)` which is at the root of this trace. This is why we have to dig deep
@@ -84,9 +82,9 @@ impl OpenTelemetryContext {
                     if let Some(span) = registry.span(&id) {
                         let mut extensions = span.extensions_mut();
                         if let Some(OtelData {
-                            builder: _,
-                            parent_cx,
-                        }) = extensions.remove::<OtelData>()
+                                        builder: _,
+                                        parent_cx,
+                                    }) = extensions.remove::<OtelData>()
                         {
                             result = Some(OpenTelemetryContext::inject(&parent_cx))
                         }

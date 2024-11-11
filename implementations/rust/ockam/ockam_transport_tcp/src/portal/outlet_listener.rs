@@ -28,7 +28,6 @@ impl TcpOutletListenWorker {
         }
     }
 
-    #[instrument(skip_all, name = "TcpOutletListenWorker::start")]
     pub(crate) async fn start(
         ctx: &Context,
         registry: TcpRegistry,
@@ -57,21 +56,18 @@ impl Worker for TcpOutletListenWorker {
     type Context = Context;
     type Message = NeutralMessage;
 
-    #[instrument(skip_all, name = "TcpOutletListenWorker::initialize")]
     async fn initialize(&mut self, ctx: &mut Self::Context) -> Result<()> {
         self.registry.add_outlet_listener_worker(&ctx.address());
 
         Ok(())
     }
 
-    #[instrument(skip_all, name = "TcpOutletListenWorker::shutdown")]
     async fn shutdown(&mut self, ctx: &mut Self::Context) -> Result<()> {
         self.registry.remove_outlet_listener_worker(&ctx.address());
 
         Ok(())
     }
 
-    #[instrument(skip_all, name = "TcpOutletListenWorker::handle_message")]
     async fn handle_message(
         &mut self,
         ctx: &mut Self::Context,
@@ -104,7 +100,7 @@ impl Worker for TcpOutletListenWorker {
             self.options.incoming_access_control.clone(),
             self.options.outgoing_access_control.clone(),
         )
-        .await?;
+            .await?;
 
         debug!("Created Tcp Outlet at {}", addresses.sender_remote);
 

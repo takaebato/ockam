@@ -24,7 +24,6 @@ impl NonceTracker {
     }
 
     /// Mark a nonce as received, reject all invalid nonce values
-    #[instrument(skip_all)]
     pub(crate) fn mark(&self, nonce: Nonce) -> ockam_core::Result<NonceTracker> {
         let new_tracker = if nonce > self.current_nonce {
             // normal case, we increase the nonce and move the window

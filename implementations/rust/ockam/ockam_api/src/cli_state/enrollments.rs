@@ -18,7 +18,6 @@ use time::OffsetDateTime;
 /// The following CliState methods help keeping track of
 ///
 impl CliState {
-    #[instrument(skip_all, fields(name = name.clone()))]
     pub async fn is_identity_enrolled(&self, name: &Option<String>) -> Result<bool> {
         let repository = self.enrollment_repository();
 
@@ -28,7 +27,6 @@ impl CliState {
         }
     }
 
-    #[instrument(skip_all)]
     pub async fn is_default_identity_enrolled(&self) -> Result<bool> {
         Ok(self
             .enrollment_repository()
@@ -36,7 +34,6 @@ impl CliState {
             .await?)
     }
 
-    #[instrument(skip_all)]
     pub async fn identity_should_enroll(&self, name: &Option<String>, force: bool) -> Result<bool> {
         if force {
             return Ok(true);
@@ -51,7 +48,6 @@ impl CliState {
         Ok(!self.is_identity_enrolled(name).await?)
     }
 
-    #[instrument(skip_all, fields(identifier = %identifier))]
     pub async fn set_identifier_as_enrolled(
         &self,
         identifier: &Identifier,
@@ -67,7 +63,6 @@ impl CliState {
     ///
     ///  - all the currently enrolled entities
     ///  - all the known identities and their corresponding enrollment state
-    #[instrument(skip_all, fields(filter = %filter))]
     pub async fn get_identity_enrollments(
         &self,
         filter: EnrollmentFilter,
@@ -93,7 +88,6 @@ impl CliState {
     /// Return true if the user is enrolled.
     /// At the moment this check only verifies that there is a default project.
     /// This project should be the project that is created at the end of the enrollment procedure
-    #[instrument(skip_all)]
     pub async fn is_enrolled(&self) -> miette::Result<bool> {
         if !self.is_default_identity_enrolled().await? {
             return Ok(false);
@@ -342,7 +336,7 @@ impl ExportedEnrollmentTicket {
             self.authority_change_history,
             self.authority_route,
         )
-        .await
+            .await
     }
 }
 
@@ -494,14 +488,14 @@ impl EnrollmentTicket {
             &project_change_history,
             Vault::create_verifying_vault(),
         )
-        .await?;
+            .await?;
         let authority_change_history = authority_change_history.into();
         let authority_identity = Identity::import_from_string(
             None,
             &authority_change_history,
             Vault::create_verifying_vault(),
         )
-        .await?;
+            .await?;
         let authority_route = match authority_route {
             Some(a) => MultiAddr::from_str(&a)?,
             None => MultiAddr::from_str(&format!(
@@ -544,7 +538,7 @@ impl EnrollmentTicket {
             authority_change_history,
             authority_route,
         )
-        .await
+            .await
     }
 
     pub async fn new_from_legacy(ticket: LegacyEnrollmentTicket) -> Result<Self> {
@@ -579,7 +573,7 @@ impl EnrollmentTicket {
             authority_change_history,
             authority_route,
         )
-        .await
+            .await
     }
 
     pub fn project(&self) -> Result<ProjectModel> {
@@ -728,8 +722,8 @@ mod tests {
                 project_change_history,
                 Vault::create_verifying_vault()
             )
-            .await
-            .unwrap()
+                .await
+                .unwrap()
         );
         assert_eq!(
             &enrollment_ticket.project_route,
@@ -742,8 +736,8 @@ mod tests {
                 authority_change_history,
                 Vault::create_verifying_vault()
             )
-            .await
-            .unwrap()
+                .await
+                .unwrap()
         );
         assert_eq!(
             &enrollment_ticket.authority_route,
@@ -762,16 +756,16 @@ mod tests {
             project_change_history,
             Vault::create_verifying_vault(),
         )
-        .await
-        .unwrap();
+            .await
+            .unwrap();
         let authority_change_history = "81825837830101583285f6820081582045d9dac79f226762025fc82e7407aee4a4c8e7068dc04edd44f1c777b8f0cf6bf41a66e2ee7b1a79aef17b8200815840c65ce655fd57cf2ea0b0679066a24bc99e2b223341186b5eaec951101f291e96c5fc8343291a23cbd8dc063ad1f9a9554f036e8f34ab5388e444977e7e29ab0b";
         let authority_identity = Identity::import_from_string(
             None,
             authority_change_history,
             Vault::create_verifying_vault(),
         )
-        .await
-        .unwrap();
+            .await
+            .unwrap();
         let exported = ExportedEnrollmentTicket::new(
             otc.clone(),
             ProjectRoute::new_with_id(project_id).unwrap(),

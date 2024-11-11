@@ -115,7 +115,6 @@ impl OckamCommand {
         result
     }
 
-    #[instrument(skip_all, fields(command = self.subcommand.name()))]
     fn run_command(
         self,
         opts: CommandGlobalOpts,

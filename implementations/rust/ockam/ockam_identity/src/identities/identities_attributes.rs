@@ -26,7 +26,6 @@ impl IdentitiesAttributes {
     /// Return the attributes for a given pair subject/attesting authority
     /// If there are expired attributes for any subject, they are deleted before retrieving the attributes for the
     /// current subject.
-    #[instrument(skip_all, fields(subject = %subject, attested_by = %attested_by))]
     pub async fn get_attributes(
         &self,
         subject: &Identifier,
@@ -38,7 +37,6 @@ impl IdentitiesAttributes {
 
     /// Set the attributes associated with the given identity identifier.
     /// Previous values gets overridden.
-    #[instrument(skip_all, fields(subject = %subject, entry = %entry))]
     pub async fn put_attributes(&self, subject: &Identifier, entry: AttributesEntry) -> Result<()> {
         self.repository.put_attributes(subject, entry).await
     }

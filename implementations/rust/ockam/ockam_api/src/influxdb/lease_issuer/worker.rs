@@ -47,7 +47,6 @@ impl InfluxDBTokenLessorWorker {
         Ok(_self)
     }
 
-    #[instrument(skip_all, fields(method = ?req.method(), path = req.path()))]
     async fn handle_request(
         &mut self,
         _ctx: &mut Context,
@@ -100,7 +99,6 @@ impl Worker for InfluxDBTokenLessorWorker {
         Ok(())
     }
 
-    #[instrument(skip_all, name = "InfluxDBTokenLessorWorker::handle_message")]
     async fn handle_message(
         &mut self,
         ctx: &mut Context,

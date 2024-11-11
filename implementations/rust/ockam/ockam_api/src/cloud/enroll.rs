@@ -53,7 +53,6 @@ trait Enroll {
 
 #[async_trait]
 impl Enroll for ControllerClient {
-    #[instrument(skip_all, fields(attributes = %attributes))]
     async fn generate_enrollment_token(
         &self,
         ctx: &Context,
@@ -68,7 +67,6 @@ impl Enroll for ControllerClient {
             .miette_success("generate token")
     }
 
-    #[instrument(skip_all)]
     async fn authenticate_enrollment_token(
         &self,
         ctx: &Context,

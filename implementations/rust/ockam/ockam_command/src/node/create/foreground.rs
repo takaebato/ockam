@@ -25,7 +25,6 @@ use ockam_api::{fmt_log, fmt_ok};
 use ockam_core::{route, LOCAL};
 
 impl CreateCommand {
-    #[instrument(skip_all, fields(node_name = self.name))]
     pub(super) async fn foreground_mode(
         &self,
         ctx: &Context,
@@ -36,12 +35,12 @@ impl CreateCommand {
 
         if !self.skip_is_running_check
             && opts
-                .state
-                .get_node(&node_name)
-                .await
-                .ok()
-                .map(|n| n.is_running())
-                .unwrap_or(false)
+            .state
+            .get_node(&node_name)
+            .await
+            .ok()
+            .map(|n| n.is_running())
+            .unwrap_or(false)
         {
             return Err(miette!(
                 "Node {} is already running",
@@ -116,8 +115,8 @@ impl CreateCommand {
             ),
             trust_options,
         )
-        .await
-        .into_diagnostic()?;
+            .await
+            .into_diagnostic()?;
         debug!("in-memory node created");
 
         let node_manager_worker = NodeManagerWorker::new(Arc::new(node_man));
@@ -156,7 +155,7 @@ impl CreateCommand {
             &opts,
             "To exit and stop the Node, please press Ctrl+C\n",
         )
-        .await?;
+            .await?;
 
         // Clean up and exit
         let _ = ctx.stop().await;
@@ -194,7 +193,7 @@ impl CreateCommand {
                             cfg.identity,
                             route![],
                         )
-                        .await?;
+                            .await?;
                     }
                 }
             }

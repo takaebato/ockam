@@ -12,7 +12,6 @@ use ockam::Context;
 use ockam_api::{fmt_ok, DefaultAddress, RendezvousHealthcheck};
 
 impl CreateCommand {
-    #[instrument(skip_all)]
     pub(super) async fn foreground_mode(
         &self,
         ctx: &Context,
@@ -52,7 +51,7 @@ impl CreateCommand {
             &opts,
             "To exit and stop the Rendezvous Server, please press Ctrl+C\n",
         )
-        .await?;
+            .await?;
 
         // Clean up and exit
         if let Err(err) = healthcheck.stop().await {

@@ -22,7 +22,6 @@ use crate::session::session::{AdditionalSessionOptions, Session};
 
 impl NodeManager {
     #[allow(clippy::too_many_arguments)]
-    #[instrument(skip_all)]
     pub async fn create_inlet(
         self: &Arc<Self>,
         ctx: &Context,

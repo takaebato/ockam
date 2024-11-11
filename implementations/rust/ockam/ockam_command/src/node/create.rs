@@ -45,7 +45,8 @@ after_long_help = docs::after_help(AFTER_LONG_HELP)
 pub struct CreateCommand {
     /// Name of the node or a configuration to set up the node.
     /// The configuration can be either a path to a local file or a URL.
-    #[arg(value_name = "NAME_OR_CONFIGURATION", hide_default_value = true, default_value = DEFAULT_NODE_NAME)]
+    #[arg(value_name = "NAME_OR_CONFIGURATION", hide_default_value = true, default_value = DEFAULT_NODE_NAME
+    )]
     pub name: String,
 
     #[command(flatten)]
@@ -150,7 +151,6 @@ impl Default for CreateCommand {
 impl Command for CreateCommand {
     const NAME: &'static str = "node create";
 
-    #[instrument(skip_all)]
     fn run(mut self, opts: CommandGlobalOpts) -> miette::Result<()> {
         self.parse_args()?;
         if self.should_run_config() {
@@ -270,7 +270,7 @@ impl CreateCommand {
             "{}",
             fmt_ok!("Created a new Node named {}", color_primary(node_name))
         )
-        .into_diagnostic()?;
+            .into_diagnostic()?;
         if opts.state.get_node(node_name).await?.is_default() {
             writeln!(
                 buf,
@@ -280,7 +280,7 @@ impl CreateCommand {
                     color_primary(node_name)
                 )
             )
-            .into_diagnostic()?;
+                .into_diagnostic()?;
         }
         writeln!(
             buf,
@@ -290,7 +290,7 @@ impl CreateCommand {
                 color_primary(format!("ockam node show {}", node_name))
             )
         )
-        .into_diagnostic()?;
+            .into_diagnostic()?;
         Ok(buf)
     }
 

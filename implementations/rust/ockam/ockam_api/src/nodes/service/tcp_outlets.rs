@@ -15,7 +15,6 @@ use crate::nodes::BackgroundNodeClient;
 use super::{NodeManager, NodeManagerWorker};
 
 impl NodeManagerWorker {
-    #[instrument(skip_all)]
     pub(super) async fn create_outlet(
         &self,
         ctx: &Context,
@@ -87,9 +86,7 @@ impl NodeManagerWorker {
 }
 
 impl NodeManager {
-    #[instrument(skip(self, ctx))]
     #[allow(clippy::too_many_arguments)]
-    #[instrument(skip_all)]
     pub async fn create_outlet(
         &self,
         ctx: &Context,
@@ -133,7 +130,7 @@ impl NodeManager {
                     Action::HandleMessage,
                     expression,
                 )
-                .await?
+                    .await?
             }
         };
 
@@ -268,7 +265,6 @@ pub trait Outlets {
 
 #[async_trait]
 impl Outlets for BackgroundNodeClient {
-    #[instrument(skip_all, fields(to = % to, from = ? from))]
     async fn create_outlet(
         &self,
         ctx: &Context,

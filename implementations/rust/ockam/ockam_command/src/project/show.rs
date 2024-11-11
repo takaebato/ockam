@@ -52,7 +52,7 @@ impl Command for ShowCommand {
             opts,
             self.name.clone(),
         )
-        .await?)
+            .await?)
     }
 }
 
@@ -116,7 +116,6 @@ impl ShowCommandTui for ShowTui {
         Ok(project)
     }
 
-    #[instrument(skip_all)]
     async fn show_single(&self, item_name: &str) -> miette::Result<()> {
         let project = self
             .node
