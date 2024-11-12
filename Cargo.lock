@@ -4871,6 +4871,7 @@ dependencies = [
  "miette",
  "minicbor",
  "mockito",
+ "nix 0.29.0",
  "ockam",
  "ockam_abac",
  "ockam_api",
