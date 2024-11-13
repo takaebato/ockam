@@ -80,3 +80,4 @@ mod version;
 mod worker;
 
 mod influxdb;
+mod jemalloc;

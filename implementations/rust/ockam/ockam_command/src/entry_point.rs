@@ -20,6 +20,8 @@ use ockam_api::output::Output;
 ///  - Display the help if the arguments cannot be parsed and store a user journey error
 ///
 pub fn run() -> miette::Result<()> {
+    crate::jemalloc::setup();
+
     // Setup the default rustls crypto provider, this is a required step when
     // multiple backends ring/aws-lc are pulled in directly, or indirectly.
     #[cfg(feature = "aws-lc")]
