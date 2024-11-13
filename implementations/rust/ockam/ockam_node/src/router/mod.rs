@@ -1,27 +1,27 @@
+mod processor;
 mod record;
 mod shutdown;
-mod start_processor;
-mod start_worker;
 mod state;
-mod stop_processor;
-mod stop_worker;
-mod utils;
+pub mod worker;
 
 #[cfg(feature = "metrics")]
-use std::sync::atomic::AtomicUsize;
+use core::sync::atomic::AtomicUsize;
 
+use crate::channel_types::{MessageSender, SmallSender};
+use crate::relay::CtrlSignal;
+use crate::{NodeError, NodeReason};
+use alloc::string::String;
+use alloc::sync::Arc;
+use alloc::vec::Vec;
+use ockam_core::compat::collections::BTreeMap;
+use ockam_core::compat::sync::RwLock as SyncRwLock;
+use ockam_core::errcode::{Kind, Origin};
+use ockam_core::flow_control::FlowControls;
+use ockam_core::{
+    Address, AddressAndMetadata, AddressMetadata, Error, RelayMessage, Result, TransportType,
+};
 use record::{AddressRecord, InternalMap, WorkerMeta};
 use state::{NodeState, RouterState};
-
-use crate::channel_types::{router_channel, MessageSender, RouterReceiver, SmallSender};
-use crate::{
-    error::{NodeError, NodeReason},
-    relay::CtrlSignal,
-    NodeMessage, NodeReplyResult, RouterReply, ShutdownType,
-};
-use ockam_core::compat::{collections::BTreeMap, sync::Arc};
-use ockam_core::flow_control::FlowControls;
-use ockam_core::{Address, RelayMessage, Result, TransportType};
 
 /// A pair of senders to a worker relay
 #[derive(Debug)]
@@ -45,9 +45,7 @@ pub struct Router {
     /// Internal address state
     map: InternalMap,
     /// Externally registered router components
-    external: BTreeMap<TransportType, Address>,
-    /// Receiver for messages from node
-    receiver: Option<RouterReceiver<NodeMessage>>,
+    external: SyncRwLock<BTreeMap<TransportType, Address>>,
 }
 
 enum RouteType {
@@ -65,28 +63,14 @@ fn determine_type(next: &Address) -> RouteType {
 
 impl Router {
     pub fn new(flow_controls: &FlowControls) -> Self {
-        let (sender, receiver) = router_channel();
         Self {
-            state: RouterState::new(sender),
+            state: RouterState::new(),
             map: InternalMap::new(flow_controls),
-            external: BTreeMap::new(),
-            receiver: Some(receiver),
+            external: Default::default(),
         }
     }
 
-    #[cfg(feature = "metrics")]
-    pub(crate) fn get_metrics_readout(&self) -> (Arc<AtomicUsize>, Arc<AtomicUsize>) {
-        self.map.get_metrics()
-    }
-
-    /// Get the router receiver
-    fn get_recv(&mut self) -> Result<&mut RouterReceiver<NodeMessage>> {
-        self.receiver
-            .as_mut()
-            .ok_or_else(|| NodeError::NodeState(NodeReason::Corrupt).internal())
-    }
-
-    pub fn init(&mut self, addr: Address, senders: SenderPair) {
+    pub fn init(&self, addr: Address, senders: SenderPair) -> Result<()> {
         self.map.insert_address_record(
             addr.clone(),
             AddressRecord::new(
@@ -99,262 +83,90 @@ impl Router {
                     detached: true,
                 },
             ),
-        );
-        self.map.insert_alias(&addr, &addr);
+            vec![],
+        )
     }
 
-    pub fn sender(&self) -> SmallSender<NodeMessage> {
-        self.state.sender.clone()
+    pub fn set_cluster(&self, addr: Address, label: String) -> Result<()> {
+        self.map.set_cluster(label, addr)
     }
 
-    /// A utility facade to hide failures that are not really failures
-    pub async fn run(&mut self) -> Result<()> {
-        match self.run_inner().await {
-            // Everything is A-OK :)
-            Ok(()) => Ok(()),
-            // If the router has already shut down this failure is a
-            // red-herring and should be ignored -- we _have_ just
-            // terminated all workers and any message still in the
-            // system will crash the whole runtime.
-            Err(_) if !self.state.running() => {
-                warn!("One (or more) internal I/O failures caused by ungraceful router shutdown!");
-                Ok(())
-            }
-            // If we _are_ still actually running then this is a real
-            // failure and needs to be escalated
-            e => e,
-        }
+    pub fn list_workers(&self) -> Vec<Address> {
+        self.map.list_workers()
     }
 
-    async fn check_addr_not_exist(
-        &mut self,
-        addr: &Address,
-        reply: &SmallSender<NodeReplyResult>,
-    ) -> Result<()> {
-        match self.map.address_records_map().get(addr) {
-            Some(record) => {
-                if record.check() {
-                    let node = NodeError::Address(addr.clone());
-                    reply
-                        .send(Err(node.clone().already_exists()))
-                        .await
-                        .map_err(|_| NodeError::NodeState(NodeReason::Unknown).internal())?;
-
-                    Err(node.already_exists())
-                } else {
-                    self.map.free_address(addr.clone());
-                    Ok(())
-                }
-            }
-            None => Ok(()),
-        }
+    pub fn is_worker_registered_at(&self, address: &Address) -> bool {
+        self.map.is_worker_registered_at(address)
     }
 
-    async fn handle_msg(&mut self, msg: NodeMessage) -> Result<bool> {
-        #[cfg(feature = "metrics")]
-        self.map.update_metrics(); // Possibly remove this from the hot path?
+    pub async fn stop_ack(&self, addr: Address) -> Result<()> {
+        let running = self.state.running();
+        debug!(%running, "Handling shutdown ACK for {}", addr);
+        self.map.free_address(&addr);
 
-        use NodeMessage::*;
-        #[cfg(feature = "metrics")]
-        trace!(
-            "Current router alloc: {} addresses",
-            self.map.get_addr_count()
-        );
-        match msg {
-            // Successful router registration command
-            Router(tt, addr, sender) if !self.external.contains_key(&tt) => {
-                // TODO: Remove after other transport implementations are moved to new architecture
-                trace!("Registering new router for type {}", tt);
-
-                self.external.insert(tt, addr);
-                sender
-                    .send(RouterReply::ok())
-                    .await
-                    .map_err(|_| NodeError::NodeState(NodeReason::Unknown).internal())?
-            }
-            // Rejected router registration command
-            Router(_, _, sender) => {
-                // TODO: Remove after other transport implementations are moved to new architecture
-                sender
-                    .send(RouterReply::router_exists())
-                    .await
-                    .map_err(|_| NodeError::NodeState(NodeReason::Unknown).internal())?
+        if !running {
+            // The router is shutting down
+            if !self.map.cluster_done() {
+                // We are not done yet.
+                // The last worker should call another `stop_ack`
+                return Ok(());
             }
 
-            //// ==! Basic worker control
-            StartWorker {
-                addrs,
-                senders,
-                detached,
-                mailbox_count,
-                ref reply,
-                addresses_metadata,
-            } => {
-                start_worker::exec(
-                    self,
-                    addrs,
-                    senders,
-                    detached,
-                    addresses_metadata,
-                    mailbox_count,
-                    reply,
-                )
-                .await?
-            }
-            StopWorker(ref addr, ref detached, ref reply) => {
-                stop_worker::exec(self, addr, *detached, reply).await?
-            }
-
-            //// ==! Basic processor control
-            StartProcessor {
-                addrs,
-                senders,
-                ref reply,
-                addresses_metadata,
-            } => start_processor::exec(self, addrs, senders, addresses_metadata, reply).await?,
-            StopProcessor(ref addr, ref reply) => stop_processor::exec(self, addr, reply).await?,
-
-            //// ==! Core node controls
-            StopNode(ShutdownType::Graceful(timeout), reply) => {
-                // This sets state to stopping, and the sends the AbortNode message
-                if shutdown::graceful(self, timeout, reply).await? {
-                    info!("No more workers left.  Goodbye!");
-                    if let Some(sender) = self.state.stop_reply() {
-                        sender
-                            .send(RouterReply::ok())
-                            .await
-                            .map_err(|_| NodeError::NodeState(NodeReason::Unknown).internal())?;
-                        return Ok(true);
-                    };
-                }
-            }
-            StopNode(ShutdownType::Immediate, reply) => {
-                shutdown::immediate(self, reply).await?;
-                return Ok(true);
-            }
-
-            AbortNode => {
-                if let Some(sender) = self.state.stop_reply() {
-                    sender
-                        .send(RouterReply::ok())
-                        .await
-                        .map_err(|_| NodeError::NodeState(NodeReason::Unknown).internal())?;
-                    self.map.clear_address_records_map();
-                    return Ok(true);
-                }
-            }
-
-            StopAck(addr) if self.state.running() => {
-                trace!("Received shutdown ACK for address {}", addr);
-                self.map.free_address(addr);
-            }
-
-            StopAck(addr) => {
-                if shutdown::ack(self, addr).await? {
-                    info!("No more workers left.  Goodbye!");
-                    if let Some(sender) = self.state.stop_reply() {
-                        sender
-                            .send(RouterReply::ok())
-                            .await
-                            .map_err(|_| NodeError::NodeState(NodeReason::Unknown).internal())?;
-                        return Ok(true);
-                    }
-                }
-            }
-
-            ListWorkers(sender) => sender
-                .send(RouterReply::workers(
-                    self.map.address_records_map().keys().cloned().collect(),
-                ))
-                .await
-                .map_err(|_| NodeError::NodeState(NodeReason::Unknown).internal())?,
-
-            IsWorkerRegisteredAt(sender, address) => sender
-                .send(RouterReply::worker_is_registered_at_address(
-                    self.map.address_records_map().contains_key(&address),
-                ))
-                .await
-                .map_err(|_| NodeError::NodeState(NodeReason::Unknown).internal())?,
-
-            SetCluster(addr, label, reply) => {
-                debug!("Setting cluster on address {}", addr);
-                let msg = self.map.set_cluster(label, addr);
-                reply
-                    .send(msg)
-                    .await
-                    .map_err(|_| NodeError::NodeState(NodeReason::Unknown).internal())?;
-            }
-
-            SetReady(addr) => {
-                trace!("Marking address {} as ready!", addr);
-                match self.map.set_ready(addr) {
-                    Err(e) => warn!("Failed to set address as ready: {}", e),
-                    Ok(waiting) => {
-                        for sender in waiting {
-                            sender.send(RouterReply::ok()).await.map_err(|_| {
-                                NodeError::NodeState(NodeReason::Unknown).internal()
-                            })?;
-                        }
-                    }
-                }
-            }
-
-            CheckReady(addr, reply) => {
-                let ready = self.map.get_ready(addr, reply.clone());
-                if ready {
-                    reply
-                        .send(RouterReply::ok())
-                        .await
-                        .map_err(|_| NodeError::NodeState(NodeReason::Unknown).internal())?;
-                }
-            }
-
-            // Handle route/ sender requests
-            SenderReq(addr, ref reply) => match determine_type(&addr) {
-                RouteType::Internal => utils::resolve(self, addr, reply).await?,
-                // TODO: Remove after other transport implementations are moved to new architecture
-                RouteType::External(tt) => {
-                    let addr = utils::router_addr(self, tt)?;
-                    utils::resolve(self, addr, reply).await?
-                }
-            },
-            FindTerminalAddress(ref addresses, ref reply) => {
-                let terminal_address = self.map.find_terminal_address(addresses);
-                reply
-                    .send(RouterReply::terminal_address(terminal_address))
-                    .await
-                    .map_err(|_| NodeError::NodeState(NodeReason::Unknown).internal())?;
-            }
-            GetMetadata(ref address, ref reply) => {
-                let meta = self.map.get_address_metadata(address);
-                reply
-                    .send(RouterReply::metadata(meta))
-                    .await
-                    .map_err(|_| NodeError::NodeState(NodeReason::Unknown).internal())?;
+            // Check if there is a next cluster
+            let finished = self.stop_next_cluster().await?;
+            if finished {
+                self.state.terminate().await;
             }
         }
-
-        Ok(false)
-    }
-
-    /// Block current task running this router.  Return fatal errors
-    async fn run_inner(&mut self) -> Result<()> {
-        while let Some(msg) = self.get_recv()?.recv().await {
-            let msg_str = format!("{}", msg);
-            match self.handle_msg(msg).await {
-                Ok(should_break) => {
-                    if should_break {
-                        // We drop the receiver end here
-                        self.receiver.take();
-                        break;
-                    }
-                }
-                Err(err) => {
-                    debug!("Router error: {} while handling {}", err, msg_str);
-                }
-            }
-        }
-
         Ok(())
+    }
+
+    pub fn find_terminal_address(&self, addresses: Vec<Address>) -> Option<AddressAndMetadata> {
+        self.map.find_terminal_address(&addresses)
+    }
+
+    pub fn get_address_metadata(&self, address: &Address) -> Option<AddressMetadata> {
+        self.map.get_address_metadata(address)
+    }
+
+    pub fn register_router(&self, tt: TransportType, addr: Address) -> Result<()> {
+        let mut guard = self.external.write().unwrap();
+        if let alloc::collections::btree_map::Entry::Vacant(e) = guard.entry(tt) {
+            e.insert(addr);
+            Ok(())
+        } else {
+            // already exists
+            Err(Error::new(
+                Origin::Node,
+                Kind::AlreadyExists,
+                "Router already exists",
+            ))
+        }
+    }
+
+    pub fn resolve(&self, addr: &Address) -> Result<MessageSender<RelayMessage>> {
+        let addr = match determine_type(addr) {
+            RouteType::Internal => addr,
+            // TODO: Remove after other transport implementations are moved to new architecture
+            RouteType::External(tt) => &self.address_for_transport(tt)?,
+        };
+        self.map.resolve(addr)
+    }
+
+    fn address_for_transport(&self, tt: TransportType) -> Result<Address> {
+        let guard = self.external.read().unwrap();
+        guard
+            .get(&tt)
+            .cloned()
+            .ok_or_else(|| NodeError::NodeState(NodeReason::Unknown).internal())
+    }
+
+    pub async fn wait_termination(self: Arc<Self>) {
+        self.state.wait_termination().await;
+    }
+
+    #[cfg(feature = "metrics")]
+    pub(crate) fn get_metrics_readout(&self) -> (Arc<AtomicUsize>, Arc<AtomicUsize>) {
+        self.map.get_metrics()
     }
 }

@@ -1083,7 +1083,7 @@ async fn should_stop_encryptor__and__decryptor__in__secure_channel(
         0
     );
 
-    let workers = ctx.list_workers().await?;
+    let workers = ctx.list_workers();
     assert!(!workers.contains(channel1.decryptor_messaging_address()));
     assert!(!workers.contains(channel1.encryptor_messaging_address()));
     assert!(!workers.contains(channel2.decryptor_messaging_address()));

@@ -229,6 +229,10 @@ pub mod sync {
     /// Wrap `spin::RwLock` as it does not return LockResult<Guard> like `std::sync::Mutex`.
     #[derive(Debug)]
     pub struct RwLock<T>(spin::RwLock<T>);
+
+    /// Wrap `spin::RwLockWriteGuard`
+    pub type RwLockWriteGuard<'a, T> = spin::RwLockWriteGuard<'a, T>;
+
     impl<T> RwLock<T> {
         /// Creates a new spinlock wrapping the supplied data.
         pub fn new(value: T) -> Self {
@@ -290,7 +294,7 @@ pub mod sync {
 #[cfg(feature = "std")]
 pub mod sync {
     pub use std::sync::Arc;
-    pub use std::sync::{Mutex, RwLock};
+    pub use std::sync::{Mutex, RwLock, RwLockWriteGuard};
 }
 
 /// Provides `std::task` for `no_std` targets.

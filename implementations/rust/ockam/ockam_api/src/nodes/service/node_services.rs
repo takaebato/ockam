@@ -202,7 +202,7 @@ impl NodeManager {
             )));
         }
 
-        if ctx.is_worker_registered_at(addr.clone()).await? {
+        if ctx.is_worker_registered_at(&addr) {
             ctx.stop_worker(addr.clone()).await?
         };
 

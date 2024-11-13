@@ -1,12 +1,8 @@
-// use crate::message::BaseMessage;
-
-use crate::channel_types::SmallSender;
 #[cfg(feature = "std")]
 use crate::runtime;
 use crate::{
     router::{Router, SenderPair},
     tokio::runtime::Runtime,
-    NodeMessage,
 };
 use core::future::Future;
 use ockam_core::{compat::sync::Arc, Address, Result};
@@ -37,8 +33,8 @@ use ockam_core::{
 pub struct Executor {
     /// Reference to the runtime needed to spawn tasks
     rt: Arc<Runtime>,
-    /// Main worker and application router
-    router: Router,
+    /// Application router
+    router: Arc<Router>,
     /// Metrics collection endpoint
     #[cfg(feature = "metrics")]
     metrics: Arc<Metrics>,
@@ -47,7 +43,7 @@ pub struct Executor {
 impl Executor {
     /// Create a new Ockam node [`Executor`] instance
     pub fn new(rt: Arc<Runtime>, flow_controls: &FlowControls) -> Self {
-        let router = Router::new(flow_controls);
+        let router = Arc::new(Router::new(flow_controls));
         #[cfg(feature = "metrics")]
         let metrics = Metrics::new(&rt, router.get_metrics_readout());
         Self {
@@ -58,20 +54,19 @@ impl Executor {
         }
     }
 
-    /// Start the router asynchronously
-    pub async fn start_router(&mut self) -> Result<()> {
-        self.router.run().await
-    }
-
     /// Get access to the internal message sender
-    pub(crate) fn sender(&self) -> SmallSender<NodeMessage> {
-        self.router.sender()
+    pub(crate) fn router(&self) -> Arc<Router> {
+        self.router.clone()
     }
 
     /// Initialize the root application worker
-    pub(crate) fn initialize_system<S: Into<Address>>(&mut self, address: S, senders: SenderPair) {
+    pub(crate) fn initialize_system<S: Into<Address>>(
+        &self,
+        address: S,
+        senders: SenderPair,
+    ) -> Result<()> {
         trace!("Initializing node executor");
-        self.router.init(address.into(), senders);
+        self.router.init(address.into(), senders)
     }
 
     /// Initialise and run the Ockam node executor context
@@ -100,12 +95,8 @@ impl Executor {
         );
 
         // Spawn user code second
-        let sender = self.sender();
-        let future = Executor::wrapper(sender, future);
+        let future = Executor::wrapper(self.router.clone(), future);
         let join_body = self.rt.spawn(future.with_current_context());
-
-        // Then block on the execution of the router
-        self.rt.block_on(self.router.run().with_current_context())?;
 
         // Shut down metrics collector
         #[cfg(feature = "metrics")]
@@ -149,9 +140,6 @@ impl Executor {
         // Spawn user code second
         let join_body = self.rt.spawn(future.with_current_context());
 
-        // Then block on the execution of the router
-        self.rt.block_on(self.router.run().with_current_context())?;
-
         // Shut down metrics collector
         #[cfg(feature = "metrics")]
         alive.fetch_or(true, Ordering::Acquire);
@@ -167,15 +155,15 @@ impl Executor {
 
     /// Wrapper around the user provided future that will shut down the node on error
     #[cfg(feature = "std")]
-    async fn wrapper<F, T, E>(
-        sender: SmallSender<NodeMessage>,
-        future: F,
-    ) -> core::result::Result<T, E>
+    async fn wrapper<F, T, E>(router: Arc<Router>, future: F) -> core::result::Result<T, E>
     where
         F: Future<Output = core::result::Result<T, E>> + Send + 'static,
     {
         match future.await {
-            Ok(val) => Ok(val),
+            Ok(val) => {
+                router.wait_termination().await;
+                Ok(val)
+            }
             Err(e) => {
                 // We earlier sent the AbortNode message to the router here.
                 // It failed because the router state was not set to `Stopping`
@@ -184,9 +172,9 @@ impl Executor {
                 // I think way AbortNode is implemented right now, it is more of an
                 // internal/private message not meant to be directly used, without changing the
                 // router state.
-                let (req, mut rx) = NodeMessage::stop_node(crate::ShutdownType::Graceful(1));
-                let _ = sender.send(req).await;
-                let _ = rx.recv().await;
+                if let Err(error) = router.stop_graceful(1).await {
+                    error!("Failed to stop gracefully: {}", error);
+                }
                 Err(e)
             }
         }
@@ -223,11 +211,13 @@ impl Executor {
         F::Output: Send + 'static,
     {
         let _join = self.rt.spawn(future);
+        let router = self.router.clone();
 
         // Block this task executing the primary message router,
         // returning any critical failures that it encounters.
-        let future = self.router.run();
-        crate::tokio::runtime::execute(&self.rt, async move { future.await.unwrap() });
+        crate::tokio::runtime::execute(&self.rt, async move {
+            router.wait_termination().await;
+        });
         Ok(())
     }
 }

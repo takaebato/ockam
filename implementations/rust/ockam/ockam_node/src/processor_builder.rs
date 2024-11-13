@@ -1,11 +1,9 @@
 use crate::debugger;
-use crate::error::{NodeError, NodeReason};
-use crate::{relay::ProcessorRelay, Context, NodeMessage};
+use crate::{relay::ProcessorRelay, Context};
 use alloc::string::String;
 use ockam_core::compat::{sync::Arc, vec::Vec};
 use ockam_core::{
-    errcode::{Kind, Origin},
-    Address, AddressAndMetadata, AddressMetadata, DenyAll, Error, IncomingAccessControl, Mailboxes,
+    Address, AddressAndMetadata, AddressMetadata, DenyAll, IncomingAccessControl, Mailboxes,
     OutgoingAccessControl, Processor, Result,
 };
 
@@ -268,18 +266,8 @@ where
 
     debugger::log_inherit_context("PROCESSOR", context, &ctx);
 
-    // Send start request to router
-    let (msg, mut rx) = NodeMessage::start_processor(addresses, sender, metadata);
-    context
-        .sender()
-        .send(msg)
-        .await
-        .map_err(|e| Error::new(Origin::Node, Kind::Invalid, e))?;
-
-    // Wait for the actual return code
-    rx.recv()
-        .await
-        .ok_or_else(|| NodeError::NodeState(NodeReason::Unknown).internal())??;
+    let router = context.router();
+    router.start_processor(addresses, sender, metadata)?;
 
     // Then initialise the processor message relay
     ProcessorRelay::<P>::init(context.runtime(), processor, ctx, ctrl_rx);

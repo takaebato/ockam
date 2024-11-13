@@ -1,8 +1,6 @@
-use crate::tokio::sync::{
-    mpsc::Sender as DefaultSender,
-    oneshot::{self, Receiver, Sender},
-};
-use crate::NodeMessage;
+use crate::router::Router;
+use crate::tokio::sync::oneshot::{self, Receiver, Sender};
+use alloc::sync::Arc;
 use ockam_core::Address;
 
 /// A helper to implement Drop mechanisms, but async
@@ -19,7 +17,7 @@ use ockam_core::Address;
 /// additional metadata to generate messages.
 pub struct AsyncDrop {
     rx: Receiver<Address>,
-    sender: DefaultSender<NodeMessage>,
+    router: Arc<Router>,
 }
 
 impl AsyncDrop {
@@ -29,9 +27,9 @@ impl AsyncDrop {
     /// Context that creates this hook, while the `address` field must
     /// refer to the address of the context that will be deallocated
     /// this way.
-    pub fn new(sender: DefaultSender<NodeMessage>) -> (Self, Sender<Address>) {
+    pub fn new(router: Arc<Router>) -> (Self, Sender<Address>) {
         let (tx, rx) = oneshot::channel();
-        (Self { rx, sender }, tx)
+        (Self { rx, router }, tx)
     }
 
     /// Wait for the cancellation of the channel and then send a
@@ -42,15 +40,8 @@ impl AsyncDrop {
     pub async fn run(self) {
         if let Ok(addr) = self.rx.await {
             debug!("Received AsyncDrop request for address: {}", addr);
-
-            let (msg, mut reply) = NodeMessage::stop_worker(addr, true);
-            if let Err(e) = self.sender.send(msg).await {
+            if let Err(e) = self.router.stop_worker(&addr, true).await {
                 debug!("Failed sending AsyncDrop request to router: {}", e);
-            }
-
-            // Then check that address was properly shut down
-            if reply.recv().await.is_none() {
-                debug!("AsyncDrop router reply was None");
             }
         }
     }

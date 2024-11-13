@@ -133,16 +133,8 @@ impl State {
         } else {
             NodeBuilder::new().no_logging()
         };
-        let (context, mut executor) = builder.with_runtime(rt.clone()).build();
+        let (context, _executor) = builder.with_runtime(rt.clone()).build();
         let context = Arc::new(context);
-
-        // start the router, it is needed for the node manager creation
-        rt.spawn(async move {
-            executor
-                .start_router()
-                .await
-                .expect("cannot start executor")
-        });
 
         let runtime = context.runtime().clone();
         let node_manager = runtime

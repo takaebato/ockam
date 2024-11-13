@@ -103,7 +103,7 @@ impl NodeBuilder {
             {
                 Arc::new(
                     tokio::runtime::Builder::new_multi_thread()
-                        // Using a lower stack size than the default (2MB),
+                        // Using a lower stack size than the default (1MB),
                         // this helps improve the cache hit ratio and reduces
                         // the memory footprint.
                         // Can be increased if needed.
@@ -116,7 +116,7 @@ impl NodeBuilder {
             #[cfg(not(feature = "std"))]
             Arc::new(Runtime::new().expect("cannot initialize the tokio runtime"))
         });
-        let mut exe = Executor::new(rt.clone(), &flow_controls);
+        let exe = Executor::new(rt.clone(), &flow_controls);
         let addr: Address = "app".into();
 
         #[cfg(feature = "watchdog")]
@@ -129,7 +129,7 @@ impl NodeBuilder {
         // messages from workers, and to buffer incoming transcoded data.
         let (ctx, sender, _) = Context::new(
             rt.handle().clone(),
-            exe.sender(),
+            exe.router(),
             Mailboxes::new(
                 Mailbox::new(addr, Arc::new(AllowAll), Arc::new(AllowAll)),
                 vec![],
@@ -144,7 +144,8 @@ impl NodeBuilder {
         debugger::log_inherit_context("NODE", &ctx, &ctx);
 
         // Register this mailbox handle with the executor
-        exe.initialize_system("app", sender);
+        exe.initialize_system("app", sender)
+            .expect("router initialization failed");
 
         // Then return the root context and executor
         (ctx, exe)

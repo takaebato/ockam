@@ -180,7 +180,7 @@ impl BleRouter {
             .await?;
 
         trace!("Registering Ble router for type = {}", crate::BLE);
-        ctx.register(crate::BLE, main_addr).await?;
+        ctx.register(crate::BLE, main_addr)?;
 
         Ok(handle)
     }

@@ -1,4 +1,4 @@
-use crate::{Context, NodeError, NodeMessage, NodeReason};
+use crate::Context;
 use crate::{ProcessorBuilder, WorkerBuilder};
 use ockam_core::{
     Address, IncomingAccessControl, OutgoingAccessControl, Processor, Result, Worker,
@@ -90,9 +90,7 @@ impl Context {
     /// Each address in the set must be unique and unused on the
     /// current node.  Workers must implement the Worker trait and be
     /// thread-safe.  Workers run asynchronously and will be scheduled
-    /// independently of each other.  To wait for the initialisation
-    /// of your worker to complete you can use
-    /// [`wait_for()`](Self::wait_for).
+    /// independently of each other.
     ///
     /// ```rust
     /// use ockam_core::{AllowAll, Result, Worker, worker};
@@ -234,19 +232,9 @@ impl Context {
         debug!("Shutting down {} {}", t.str(), addr);
 
         // Send the stop request
-        let (req, mut rx) = match t {
-            AddressType::Worker => NodeMessage::stop_worker(addr, false),
-            AddressType::Processor => NodeMessage::stop_processor(addr),
-        };
-        self.sender
-            .send(req)
-            .await
-            .map_err(NodeError::from_send_err)?;
-
-        // Then check that address was properly shut down
-        rx.recv()
-            .await
-            .ok_or_else(|| NodeError::NodeState(NodeReason::Unknown).internal())??;
-        Ok(())
+        match t {
+            AddressType::Worker => self.router.stop_worker(&addr, false).await,
+            AddressType::Processor => self.router.stop_processor(&addr).await,
+        }
     }
 }

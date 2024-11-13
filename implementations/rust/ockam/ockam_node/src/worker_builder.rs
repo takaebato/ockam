@@ -1,12 +1,10 @@
 use crate::debugger;
-use crate::error::{NodeError, NodeReason};
-use crate::{relay::WorkerRelay, Context, NodeMessage};
+use crate::{relay::WorkerRelay, Context};
 use alloc::string::String;
 use ockam_core::compat::{sync::Arc, vec::Vec};
 use ockam_core::{
-    errcode::{Kind, Origin},
-    Address, AddressAndMetadata, AddressMetadata, AllowAll, Error, IncomingAccessControl,
-    Mailboxes, OutgoingAccessControl, Result, Worker,
+    Address, AddressAndMetadata, AddressMetadata, AllowAll, IncomingAccessControl, Mailboxes,
+    OutgoingAccessControl, Result, Worker,
 };
 
 /// Start a [`Worker`] with a custom configuration
@@ -267,19 +265,8 @@ where
 
     debugger::log_inherit_context("WORKER", context, &ctx);
 
-    // Send start request to router
-    let (msg, mut rx) =
-        NodeMessage::start_worker(addresses, sender, false, context.mailbox_count(), metadata);
-    context
-        .sender()
-        .send(msg)
-        .await
-        .map_err(|e| Error::new(Origin::Node, Kind::Invalid, e))?;
-
-    // Wait for the actual return code
-    rx.recv()
-        .await
-        .ok_or_else(|| NodeError::NodeState(NodeReason::Unknown).internal())??;
+    let router = context.router();
+    router.start_worker(addresses, sender, false, metadata, context.mailbox_count())?;
 
     // Then initialise the worker message relay
     WorkerRelay::init(context.runtime(), worker, ctx, ctrl_rx);

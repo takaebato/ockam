@@ -98,19 +98,11 @@ impl AppState {
     ) -> Result<AppState> {
         let cli_state = CliState::with_default_dir()?;
         let rt = Arc::new(Runtime::new().expect("cannot create a tokio runtime"));
-        let (context, mut executor) = NodeBuilder::new()
+        let (context, _executor) = NodeBuilder::new()
             .no_logging()
             .with_runtime(rt.clone())
             .build();
         let context = Arc::new(context);
-
-        // start the router, it is needed for the node manager creation
-        rt.spawn(async move {
-            let result = executor.start_router().await;
-            if let Err(e) = result {
-                error!(%e, "Failed to start the router")
-            }
-        });
 
         let runtime = context.runtime().clone();
         let future = async {
@@ -327,7 +319,7 @@ impl AppState {
 
         info!("stopped the old node manager");
 
-        for w in self.context.list_workers().await.into_diagnostic()? {
+        for w in self.context.list_workers() {
             let _ = self.context.stop_worker(w.address()).await;
         }
         info!("stopped all the ctx workers");

@@ -95,7 +95,7 @@ impl WebSocketRouter {
             .start(ctx)
             .await?;
         trace!("Registering WS router for type = {}", WS);
-        ctx.register(WS, main_addr).await?;
+        ctx.register(WS, main_addr)?;
 
         Ok(handle)
     }

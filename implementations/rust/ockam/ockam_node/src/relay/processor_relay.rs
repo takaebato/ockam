@@ -38,10 +38,6 @@ where
             }
         }
 
-        if let Err(e) = ctx.set_ready().await {
-            error!("Failed to mark processor '{}' as 'ready': {}", ctx_addr, e);
-        }
-
         // This future encodes the main processor run loop logic
         let run_loop = async {
             loop {
@@ -119,7 +115,7 @@ async fn shutdown_and_stop_ack<P>(
 
     // Finally send the router a stop ACK -- log errors
     trace!("Sending shutdown ACK");
-    if let Err(e) = ctx.send_stop_ack().await {
-        error!("Error occurred during stop ACK sending: {}", e);
-    }
+    ctx.stop_ack().await.unwrap_or_else(|e| {
+        error!("Failed to send stop ACK for '{}': {}", ctx_addr, e);
+    });
 }

@@ -60,7 +60,7 @@ impl UdsRouter {
             .await?;
 
         trace!("Registering UDS router for type = {}", UDS);
-        ctx.register(UDS, main_addr).await?;
+        ctx.register(UDS, main_addr)?;
 
         Ok(handle)
     }

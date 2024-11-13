@@ -1,6 +1,6 @@
-use crate::channel_types::{SmallReceiver, SmallSender};
+use crate::channel_types::SmallReceiver;
 use crate::tokio::runtime::Handle;
-use crate::{error::*, AsyncDropSender, NodeMessage};
+use crate::AsyncDropSender;
 use core::sync::atomic::AtomicUsize;
 use ockam_core::compat::collections::HashMap;
 use ockam_core::compat::sync::{Arc, RwLock};
@@ -14,6 +14,7 @@ use ockam_core::{
     Result, TransportType,
 };
 
+use crate::router::Router;
 #[cfg(feature = "std")]
 use core::fmt::{Debug, Formatter};
 use ockam_core::errcode::{Kind, Origin};
@@ -25,7 +26,7 @@ pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
 /// Context contains Node state and references to the runtime.
 pub struct Context {
     pub(super) mailboxes: Mailboxes,
-    pub(super) sender: SmallSender<NodeMessage>,
+    pub(super) router: Arc<Router>,
     pub(super) rt: Handle,
     pub(super) receiver: SmallReceiver<RelayMessage>,
     pub(super) async_drop_sender: Option<AsyncDropSender>,
@@ -49,7 +50,6 @@ impl Debug for Context {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("Context")
             .field("mailboxes", &self.mailboxes)
-            .field("sender", &self.sender)
             .field("runtime", &self.rt)
             .finish()
     }
@@ -67,8 +67,8 @@ impl Context {
     }
 
     /// Return a reference to sender
-    pub(crate) fn sender(&self) -> &SmallSender<NodeMessage> {
-        &self.sender
+    pub(crate) fn router(&self) -> Arc<Router> {
+        self.router.clone()
     }
 
     /// Return the primary address of the current worker
@@ -126,82 +126,22 @@ impl Context {
     /// Clusters are de-allocated in reverse order of their
     /// initialisation when the node is stopped.
     pub async fn set_cluster<S: Into<String>>(&self, label: S) -> Result<()> {
-        let (msg, mut rx) = NodeMessage::set_cluster(self.address(), label.into());
-        self.sender
-            .send(msg)
-            .await
-            .map_err(NodeError::from_send_err)?;
-        rx.recv()
-            .await
-            .ok_or_else(|| NodeError::NodeState(NodeReason::Unknown).internal())??
-            .is_ok()
+        self.router.set_cluster(self.address(), label.into())
     }
 
     /// Return a list of all available worker addresses on a node
-    pub async fn list_workers(&self) -> Result<Vec<Address>> {
-        let (msg, mut reply_rx) = NodeMessage::list_workers();
-
-        self.sender
-            .send(msg)
-            .await
-            .map_err(NodeError::from_send_err)?;
-
-        reply_rx
-            .recv()
-            .await
-            .ok_or_else(|| NodeError::NodeState(NodeReason::Unknown).internal())??
-            .take_workers()
+    pub fn list_workers(&self) -> Vec<Address> {
+        self.router.list_workers()
     }
 
     /// Return true if a worker is already registered at this address
-    pub async fn is_worker_registered_at(&self, address: Address) -> Result<bool> {
-        let (msg, mut reply_rx) = NodeMessage::is_worker_registered_at(address.clone());
-
-        self.sender
-            .send(msg)
-            .await
-            .map_err(NodeError::from_send_err)?;
-
-        reply_rx
-            .recv()
-            .await
-            .ok_or_else(|| NodeError::NodeState(NodeReason::Unknown).internal())??
-            .take_worker_is_registered()
+    pub fn is_worker_registered_at(&self, address: &Address) -> bool {
+        self.router.is_worker_registered_at(address)
     }
 
     /// Send a shutdown acknowledgement to the router
-    pub(crate) async fn send_stop_ack(&self) -> Result<()> {
-        self.sender
-            .send(NodeMessage::StopAck(self.address()))
-            .await
-            .map_err(NodeError::from_send_err)?;
-        Ok(())
-    }
-
-    /// This function is called by Relay to indicate a worker is initialised
-    pub(crate) async fn set_ready(&mut self) -> Result<()> {
-        self.sender
-            .send(NodeMessage::set_ready(self.address()))
-            .await
-            .map_err(NodeError::from_send_err)?;
-        Ok(())
-    }
-
-    /// Wait for a particular address to become "ready"
-    pub async fn wait_for<A: Into<Address>>(&self, addr: A) -> Result<()> {
-        let (msg, mut reply) = NodeMessage::get_ready(addr.into());
-        self.sender
-            .send(msg)
-            .await
-            .map_err(NodeError::from_send_err)?;
-
-        // This call blocks until the address has become ready or is
-        // dropped by the router
-        reply
-            .recv()
-            .await
-            .ok_or_else(|| NodeError::NodeState(NodeReason::Unknown).internal())??;
-        Ok(())
+    pub(crate) async fn stop_ack(&self) -> Result<()> {
+        self.router.stop_ack(self.address()).await
     }
 
     /// Finds the terminal address of a route, if present
@@ -210,7 +150,6 @@ impl Context {
         route: impl Into<Vec<Address>>,
     ) -> Result<Option<AddressAndMetadata>> {
         let addresses = route.into();
-
         if addresses.iter().any(|a| !a.transport_type().is_local()) {
             return Err(Error::new(
                 Origin::Node,
@@ -219,34 +158,11 @@ impl Context {
             ));
         }
 
-        let (msg, mut reply) = NodeMessage::find_terminal_address(addresses);
-        self.sender
-            .send(msg)
-            .await
-            .map_err(NodeError::from_send_err)?;
-
-        reply
-            .recv()
-            .await
-            .ok_or_else(|| NodeError::NodeState(NodeReason::Unknown).internal())??
-            .take_terminal_address()
+        Ok(self.router.find_terminal_address(addresses))
     }
 
     /// Read metadata for the provided address
-    pub async fn get_metadata(
-        &self,
-        address: impl Into<Address>,
-    ) -> Result<Option<AddressMetadata>> {
-        let (msg, mut reply) = NodeMessage::get_metadata(address.into());
-        self.sender
-            .send(msg)
-            .await
-            .map_err(NodeError::from_send_err)?;
-
-        reply
-            .recv()
-            .await
-            .ok_or_else(|| NodeError::NodeState(NodeReason::Unknown).internal())??
-            .take_metadata()
+    pub fn get_metadata(&self, address: impl Into<Address>) -> Option<AddressMetadata> {
+        self.router.get_address_metadata(&address.into())
     }
 }

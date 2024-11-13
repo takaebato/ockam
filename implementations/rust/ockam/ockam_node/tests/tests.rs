@@ -14,7 +14,6 @@ use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicI8, AtomicU32};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::time::sleep;
-use tracing::info;
 
 #[allow(non_snake_case)]
 #[ockam_macros::test]
@@ -173,7 +172,7 @@ async fn worker_initialize_fail_should_shutdown(ctx: &mut Context) -> Result<()>
     sleep(Duration::new(1, 0)).await;
     assert!(shutdown_was_called.load(Ordering::Relaxed));
 
-    assert!(!ctx.list_workers().await?.contains(&address));
+    assert!(!ctx.list_workers().contains(&address));
 
     Ok(())
 }
@@ -208,7 +207,7 @@ async fn processor_initialize_fail_should_shutdown(ctx: &mut Context) -> Result<
     assert!(res.is_ok());
     sleep(Duration::new(1, 0)).await;
     assert!(shutdown_was_called.load(Ordering::Relaxed));
-    assert!(!ctx.list_workers().await?.contains(&address));
+    assert!(!ctx.list_workers().contains(&address));
 
     Ok(())
 }
@@ -288,7 +287,7 @@ async fn counting_processor__run_node_lifecycle__processor_lifecycle_should_be_f
     };
 
     ctx.start_processor("counting_processor", processor).await?;
-    sleep(Duration::new(1, 0)).await;
+    sleep(Duration::from_secs(1)).await;
 
     assert!(initialize_was_called.load(Ordering::Relaxed));
     assert!(shutdown_was_called.load(Ordering::Relaxed));
@@ -308,22 +307,17 @@ impl Processor for WaitingProcessor {
 
     async fn initialize(&mut self, _context: &mut Self::Context) -> Result<()> {
         self.initialize_was_called.store(true, Ordering::Relaxed);
-        assert!(self.initialize_was_called.load(Ordering::Relaxed));
-
         Ok(())
     }
 
     async fn shutdown(&mut self, _context: &mut Self::Context) -> Result<()> {
         self.shutdown_was_called.store(true, Ordering::Relaxed);
         assert!(self.initialize_was_called.load(Ordering::Relaxed));
-        assert!(self.shutdown_was_called.load(Ordering::Relaxed));
-
         Ok(())
     }
 
     async fn process(&mut self, _ctx: &mut Self::Context) -> Result<bool> {
-        sleep(Duration::new(1, 0)).await;
-
+        sleep(Duration::from_secs(10)).await;
         Ok(true)
     }
 }
@@ -334,20 +328,16 @@ async fn waiting_processor__shutdown__should_be_interrupted(ctx: &mut Context) -
     let initialize_was_called = Arc::new(AtomicBool::new(false));
     let shutdown_was_called = Arc::new(AtomicBool::new(false));
 
-    let initialize_was_called_clone = initialize_was_called.clone();
-    let shutdown_was_called_clone = shutdown_was_called.clone();
-
     let processor = WaitingProcessor {
-        initialize_was_called: initialize_was_called_clone,
-        shutdown_was_called: shutdown_was_called_clone,
+        initialize_was_called: initialize_was_called.clone(),
+        shutdown_was_called: shutdown_was_called.clone(),
     };
 
     ctx.start_processor("waiting_processor", processor).await?;
-    sleep(Duration::new(1, 0)).await;
+    sleep(Duration::from_secs(1)).await;
 
     ctx.stop_processor("waiting_processor").await?;
-    // Wait till tokio Runtime is shut down
-    std::thread::sleep(Duration::new(1, 0));
+    sleep(Duration::from_secs(1)).await;
 
     assert!(initialize_was_called.load(Ordering::Relaxed));
     assert!(shutdown_was_called.load(Ordering::Relaxed));
@@ -459,41 +449,6 @@ async fn abort_blocked_shutdown(ctx: &mut Context) -> Result<()> {
     ockam_node::tokio::time::timeout(Duration::from_secs(2), ctx.stop())
         .await
         .unwrap()
-}
-
-struct WaitForWorker;
-
-#[ockam_core::worker]
-impl Worker for WaitForWorker {
-    type Context = Context;
-    type Message = ();
-
-    async fn initialize(&mut self, ctx: &mut Context) -> Result<()> {
-        info!("This worker initialises a bit slow");
-        ctx.sleep(Duration::from_secs(1)).await;
-        info!("Worker done");
-        Ok(())
-    }
-}
-
-#[ockam_macros::test]
-async fn wait_for_worker(ctx: &mut Context) -> Result<()> {
-    let t1 = tokio::time::Instant::now();
-    ctx.start_worker_with_access_control("slow", WaitForWorker, DenyAll, DenyAll)
-        .await
-        .unwrap();
-
-    info!("Waiting for worker...");
-    ctx.wait_for("slow").await.unwrap();
-    info!("Done waiting :)");
-
-    let t2 = tokio::time::Instant::now();
-    assert!((t2 - t1) > Duration::from_secs(1));
-
-    if let Err(e) = ctx.stop().await {
-        println!("Unclean stop: {}", e)
-    }
-    Ok(())
 }
 
 struct StopFromHandleMessageWorker {

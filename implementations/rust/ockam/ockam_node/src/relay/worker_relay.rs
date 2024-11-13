@@ -111,10 +111,6 @@ where
 
         let address = self.ctx.address();
 
-        if let Err(e) = self.ctx.set_ready().await {
-            error!("Failed to mark worker '{}' as 'ready': {}", address, e);
-        }
-
         #[cfg(feature = "std")]
         loop {
             crate::tokio::select! {
@@ -180,9 +176,13 @@ where
 
         // Finally send the router a stop ACK -- log errors
         trace!("Sending shutdown ACK");
-        if let Err(e) = self.ctx.send_stop_ack().await {
-            error!("Error occurred during stop ACK sending: {}", e);
-        }
+        self.ctx.stop_ack().await.unwrap_or_else(|e| {
+            error!(
+                "Failed to send stop ACK for worker '{}': {}",
+                self.ctx.address(),
+                e
+            )
+        });
     }
 
     /// Build and spawn a new worker relay, returning a send handle to it

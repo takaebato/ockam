@@ -307,9 +307,6 @@ impl ConnectionBuilder {
                     if last_pass && is_last {
                         let is_terminal = ctx
                             .get_metadata(address.clone())
-                            .await
-                            .ok()
-                            .flatten()
                             .map(|m| m.is_terminal)
                             .unwrap_or(false);
 

@@ -84,7 +84,7 @@ mod tests {
     async fn test_resolve_address(ctx: &mut Context) -> Result<()> {
         let udp = UdpTransport::create(ctx).await?;
         let udp_address = "127.0.0.1:0";
-        let initial_workers = ctx.list_workers().await?;
+        let initial_workers = ctx.list_workers();
         let socket = UdpSocket::bind(udp_address)
             .await
             .map_err(TransportError::from)?;
@@ -95,7 +95,7 @@ mod tests {
             .await?;
 
         // there are 2 additional workers
-        let mut additional_workers = ctx.list_workers().await?;
+        let mut additional_workers = ctx.list_workers();
         additional_workers.retain(|w| !initial_workers.contains(w));
         assert_eq!(additional_workers.len(), 2);
 
