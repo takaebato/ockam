@@ -23,6 +23,11 @@ mod execution;
 mod portal_simulator;
 mod stats;
 
+use mimalloc::MiMalloc;
+
+#[global_allocator]
+static GLOBAL: MiMalloc = MiMalloc;
+
 #[derive(Debug, Args, Clone)]
 struct RunCommand {
     config: PathBuf,

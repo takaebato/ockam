@@ -304,6 +304,7 @@ This file contains attributions for any 3rd-party open source code used in this 
 | libdbus-sys | Apache-2.0, MIT | https://crates.io/crates/libdbus-sys |
 | libloading | ISC | https://crates.io/crates/libloading |
 | libm | MIT, Apache-2.0 | https://crates.io/crates/libm |
+| libmimalloc-sys | MIT | https://crates.io/crates/libmimalloc-sys |
 | libsqlite3-sys | MIT | https://crates.io/crates/libsqlite3-sys |
 | linked-hash-map | MIT, Apache-2.0 | https://crates.io/crates/linked-hash-map |
 | linux-raw-sys | Apache-2.0 WITH LLVM-exception, Apache-2.0, MIT | https://crates.io/crates/linux-raw-sys |
@@ -320,6 +321,7 @@ This file contains attributions for any 3rd-party open source code used in this 
 | memoffset | MIT | https://crates.io/crates/memoffset |
 | miette | Apache-2.0 | https://crates.io/crates/miette |
 | miette-derive | Apache-2.0 | https://crates.io/crates/miette-derive |
+| mimalloc | MIT | https://crates.io/crates/mimalloc |
 | mime | MIT, Apache-2.0 | https://crates.io/crates/mime |
 | minicbor | BlueOak-1.0.0 | https://crates.io/crates/minicbor |
 | minicbor-derive | BlueOak-1.0.0 | https://crates.io/crates/minicbor-derive |
