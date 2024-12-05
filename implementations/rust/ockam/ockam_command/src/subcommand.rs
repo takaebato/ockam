@@ -27,6 +27,7 @@ use crate::identity::IdentityCommand;
 use crate::influxdb::inlet::InfluxDBInletCommand;
 use crate::influxdb::outlet::InfluxDBOutletCommand;
 use crate::kafka::consumer::KafkaConsumerCommand;
+use crate::kafka::custodian::KafkaCustodianCommand;
 use crate::kafka::inlet::KafkaInletCommand;
 use crate::kafka::outlet::KafkaOutletCommand;
 use crate::kafka::producer::KafkaProducerCommand;
@@ -104,6 +105,7 @@ pub enum OckamSubcommand {
 
     KafkaConsumer(KafkaConsumerCommand),
     KafkaProducer(KafkaProducerCommand),
+    KafkaCustodian(KafkaCustodianCommand),
 
     SecureChannelListener(SecureChannelListenerCommand),
     SecureChannel(SecureChannelCommand),
@@ -149,7 +151,6 @@ impl OckamSubcommand {
             OckamSubcommand::Message(c) => c.run(opts),
             OckamSubcommand::Relay(c) => c.run(opts),
 
-            OckamSubcommand::KafkaOutlet(c) => c.run(opts),
             OckamSubcommand::TcpListener(c) => c.run(opts),
             OckamSubcommand::TcpConnection(c) => c.run(opts),
             OckamSubcommand::TcpOutlet(c) => c.run(opts),
@@ -161,6 +162,8 @@ impl OckamSubcommand {
             OckamSubcommand::Rendezvous(c) => c.run(opts),
 
             OckamSubcommand::KafkaInlet(c) => c.run(opts),
+            OckamSubcommand::KafkaOutlet(c) => c.run(opts),
+            OckamSubcommand::KafkaCustodian(c) => c.run(opts),
             OckamSubcommand::KafkaConsumer(c) => c.run(opts),
             OckamSubcommand::KafkaProducer(c) => c.run(opts),
 
@@ -327,6 +330,7 @@ impl OckamSubcommand {
             OckamSubcommand::Manpages(c) => c.name(),
             OckamSubcommand::Environment(c) => c.name(),
             OckamSubcommand::FlowControl(c) => c.name(),
+            OckamSubcommand::KafkaCustodian(c) => c.name(),
         }
     }
 }

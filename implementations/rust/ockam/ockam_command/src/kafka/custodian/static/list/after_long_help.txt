@@ -1,0 +1,7 @@
+```sh
+# To list the kafka custodian on the default node
+$ ockam kafka-custodian list
+
+# To list the kafka custodian on a specific node
+$ ockam kafka-custodian list --at n
+```

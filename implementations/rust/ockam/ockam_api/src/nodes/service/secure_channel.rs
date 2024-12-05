@@ -303,6 +303,8 @@ impl NodeManager {
 
 /// SECURE CHANNEL LISTENERS
 impl NodeManager {
+    //TODO: remove everything about key exchange service from secure channel
+    #[allow(dead_code)]
     pub(crate) async fn start_key_exchanger_service(
         &self,
         context: &Context,

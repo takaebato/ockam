@@ -131,6 +131,9 @@ impl NodeManagerWorker {
                 req,
                 self.start_kafka_outlet_service(ctx, dec.decode()?).await,
             )?,
+            (Post, ["node", "services", DefaultAddress::KAFKA_CUSTODIAN]) => {
+                encode_response(req, self.start_custodian_service(ctx, dec.decode()?).await)?
+            }
             (Delete, ["node", "services", DefaultAddress::KAFKA_OUTLET]) => encode_response(
                 req,
                 self.delete_kafka_service(ctx, dec.decode()?, KafkaServiceKind::Outlet)

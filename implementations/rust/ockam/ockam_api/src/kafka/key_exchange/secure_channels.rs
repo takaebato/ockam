@@ -2,42 +2,72 @@ use crate::kafka::key_exchange::controller::{
     InnerSecureChannelController, KafkaKeyExchangeControllerImpl, RequiredOperation,
     TopicEncryptionKey, TopicEncryptionKeyState,
 };
+use crate::kafka::key_exchange::listener::{KeyExchangeRequest, KeyExchangeResponse};
 use crate::kafka::ConsumerResolution;
-use crate::nodes::service::SecureChannelType;
 use crate::DefaultAddress;
-use ockam::identity::{SecureChannelRegistryEntry, TimestampInSeconds};
+use ockam::identity::TimestampInSeconds;
 use ockam_core::errcode::{Kind, Origin};
-use ockam_core::{Address, Error, Result};
+use ockam_core::{Error, Result};
 use ockam_multiaddr::proto::{Secure, Service};
 use ockam_multiaddr::MultiAddr;
-use ockam_node::Context;
-use time::Duration;
+use ockam_node::{Context, MessageSendReceiveOptions};
+use ockam_vault::AeadSecretKeyHandle;
+use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::MutexGuard;
+
+pub(crate) struct ExchangedKey {
+    pub secret_key_handler: AeadSecretKeyHandle,
+    pub key_identifier_for_consumer: Vec<u8>,
+    pub valid_until: TimestampInSeconds,
+    pub rotate_after: TimestampInSeconds,
+    pub rekey_period: Duration,
+}
 
 impl KafkaKeyExchangeControllerImpl {
     /// Creates a secure channel for the given destination, for key exchange only.
-    async fn create_key_exchange_only_secure_channel(
+    async fn ask_for_key_over_secure_channel(
+        &self,
         inner: &MutexGuard<'_, InnerSecureChannelController>,
         context: &Context,
         mut destination: MultiAddr,
-    ) -> Result<Address> {
-        destination.push_back(Service::new(DefaultAddress::KEY_EXCHANGER_LISTENER))?;
+    ) -> Result<ExchangedKey> {
+        destination.push_back(Secure::new(DefaultAddress::SECURE_CHANNEL_LISTENER))?;
+        destination.push_back(Service::new(DefaultAddress::KAFKA_CUSTODIAN))?;
         if let Some(node_manager) = inner.node_manager.upgrade() {
-            let secure_channel = node_manager
-                .create_secure_channel(
-                    context,
-                    destination,
-                    None,
-                    None,
-                    None,
-                    None,
-                    SecureChannelType::KeyExchangeOnly,
-                )
+            let connection = node_manager
+                .make_connection(context, &destination, node_manager.identifier(), None, None)
                 .await?;
 
-            // TODO: temporary workaround until the secure channel persistence is changed
-            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-            Ok(secure_channel.encryptor_address().clone())
+            let send_and_receive_options = MessageSendReceiveOptions::new()
+                .with_incoming_access_control(Arc::new(
+                    inner.consumer_policy_access_control.create_incoming(),
+                ))
+                .with_outgoing_access_control(Arc::new(
+                    inner
+                        .consumer_policy_access_control
+                        .create_outgoing(context)
+                        .await?,
+                ));
+
+            let route = connection.route()?;
+            let response: KeyExchangeResponse = context
+                .send_and_receive_extended(route, KeyExchangeRequest {}, send_and_receive_options)
+                .await?
+                .into_body()?;
+
+            let aead_secret_key_handle = self
+                .encryption_at_rest
+                .import_aead_key(response.secret_key.to_vec())
+                .await?;
+
+            Ok(ExchangedKey {
+                secret_key_handler: aead_secret_key_handle,
+                key_identifier_for_consumer: response.key_identifier_for_consumer,
+                valid_until: response.valid_until,
+                rotate_after: response.rotate_after,
+                rekey_period: response.rekey_period,
+            })
         } else {
             Err(Error::new(
                 Origin::Transport,
@@ -57,31 +87,37 @@ impl KafkaKeyExchangeControllerImpl {
         let mut inner = self.inner.lock().await;
 
         let rekey_counter;
-        let encryptor_address;
+        let secret_key_handle;
+        let key_identifier_for_consumer;
 
         let now = TimestampInSeconds(inner.clock.now()?);
-        let secure_channels = inner.secure_channels.clone();
         if let Some(encryption_key) = inner.producer_topic_encryptor_map.get_mut(topic_name) {
             // before using it, check if it's still valid
             match encryption_key.operation(now)? {
                 RequiredOperation::None => {
                     // the key is still valid
                     rekey_counter = encryption_key.rekey_counter;
-                    encryptor_address = encryption_key.producer_encryptor_address.clone();
+                    secret_key_handle = encryption_key.secret_key_handle.clone();
+                    key_identifier_for_consumer =
+                        encryption_key.key_identifier_for_consumer.clone();
                 }
                 RequiredOperation::Rekey => {
-                    encryption_key.rekey(context, &secure_channels, now).await?;
+                    encryption_key.rekey(&self.encryption_at_rest, now).await?;
                     rekey_counter = encryption_key.rekey_counter;
-                    encryptor_address = encryption_key.producer_encryptor_address.clone();
+                    secret_key_handle = encryption_key.secret_key_handle.clone();
+                    key_identifier_for_consumer =
+                        encryption_key.key_identifier_for_consumer.clone();
                 }
                 RequiredOperation::ShouldRotate => {
                     encryption_key.mark_rotation_attempt();
                     // the key is still valid, but it's time to rotate it
                     let result = self.exchange_key(context, topic_name, &mut inner).await;
                     match result {
-                        Ok(producer_encryptor_address) => {
-                            rekey_counter = 0;
-                            encryptor_address = producer_encryptor_address;
+                        Ok(new_state) => {
+                            rekey_counter = new_state.rekey_counter;
+                            secret_key_handle = new_state.secret_key_handle.clone();
+                            key_identifier_for_consumer =
+                                new_state.key_identifier_for_consumer.clone();
                         }
                         Err(error) => {
                             warn!(
@@ -96,49 +132,44 @@ impl KafkaKeyExchangeControllerImpl {
 
                             // we might still need to rekey
                             if let RequiredOperation::Rekey = encryption_key.operation(now)? {
-                                encryption_key.rekey(context, &secure_channels, now).await?;
+                                encryption_key.rekey(&self.encryption_at_rest, now).await?;
                             }
 
-                            encryptor_address = encryption_key.producer_encryptor_address.clone();
+                            secret_key_handle = encryption_key.secret_key_handle.clone();
                             rekey_counter = encryption_key.rekey_counter;
+                            key_identifier_for_consumer =
+                                encryption_key.key_identifier_for_consumer.clone();
                         }
                     }
                 }
                 RequiredOperation::MustRotate => {
                     // the key is no longer valid, must not be reused
-                    rekey_counter = 0;
-                    encryptor_address = self.exchange_key(context, topic_name, &mut inner).await?;
+                    let new_key_state = self.exchange_key(context, topic_name, &mut inner).await?;
+                    secret_key_handle = new_key_state.secret_key_handle.clone();
+                    key_identifier_for_consumer = new_key_state.key_identifier_for_consumer.clone();
+                    rekey_counter = new_key_state.rekey_counter;
                 }
             };
         } else {
-            rekey_counter = 0;
-            encryptor_address = self.exchange_key(context, topic_name, &mut inner).await?;
+            let new_key_state = self.exchange_key(context, topic_name, &mut inner).await?;
+            secret_key_handle = new_key_state.secret_key_handle.clone();
+            key_identifier_for_consumer = new_key_state.key_identifier_for_consumer.clone();
+            rekey_counter = new_key_state.rekey_counter;
         };
-
-        let entry =         secure_channels
-            .secure_channel_registry()
-            .get_channel_by_encryptor_address(&encryptor_address)
-            .ok_or_else(|| {
-                Error::new(
-                    Origin::Channel,
-                    Kind::Unknown,
-                    format!("cannot find secure channel address `{encryptor_address}` in local registry"),
-                )
-            })?;
 
         Ok(TopicEncryptionKey {
             rekey_counter,
-            encryptor_api_address: entry.encryptor_api_address().clone(),
-            consumer_decryptor_address: entry.their_decryptor_address().clone(),
+            secret_key_handle,
+            key_identifier_for_consumer,
         })
     }
 
-    async fn exchange_key(
-        &self,
+    async fn exchange_key<'a>(
+        &'a self,
         context: &mut Context,
         topic_name: &str,
-        inner: &mut MutexGuard<'_, InnerSecureChannelController>,
-    ) -> Result<Address> {
+        inner: &'a mut MutexGuard<'_, InnerSecureChannelController>,
+    ) -> Result<&'a TopicEncryptionKeyState> {
         // destination is without the final service
         let destination = match inner.consumer_resolution.clone() {
             ConsumerResolution::SingleNode(mut destination) => {
@@ -171,45 +202,17 @@ impl KafkaKeyExchangeControllerImpl {
             }
         };
 
-        let producer_encryptor_address =
-            Self::create_key_exchange_only_secure_channel(inner, context, destination.clone())
-                .await?;
-
-        if let Some(entry) = inner
-            .secure_channels
-            .secure_channel_registry()
-            .get_channel_by_encryptor_address(&producer_encryptor_address)
-        {
-            if let Err(error) = Self::validate_consumer_credentials(inner, &entry).await {
-                if let Some(node_manager) = inner.node_manager.upgrade() {
-                    node_manager
-                        .delete_secure_channel(context, &producer_encryptor_address)
-                        .await?;
-                }
-                return Err(error);
-            };
-        } else {
-            return Err(Error::new(
-                Origin::Transport,
-                Kind::Internal,
-                format!(
-                    "cannot find secure channel address `{producer_encryptor_address}` in local registry"
-                ),
-            ));
-        }
+        let exchanged_key = self
+            .ask_for_key_over_secure_channel(inner, context, destination.clone())
+            .await?;
 
         let now = TimestampInSeconds(inner.clock.now()?);
-
-        // TODO: retrieve these values from the other party
-        let valid_until = now + TimestampInSeconds(10 * 60); // 10 minutes
-        let rotate_after = now + TimestampInSeconds(5 * 60); // 5 minutes
-        let rekey_period = Duration::minutes(1);
-
         let encryption_key = TopicEncryptionKeyState {
-            producer_encryptor_address: producer_encryptor_address.clone(),
-            valid_until,
-            rotate_after,
-            rekey_period,
+            secret_key_handle: exchanged_key.secret_key_handler,
+            key_identifier_for_consumer: exchanged_key.key_identifier_for_consumer,
+            valid_until: exchanged_key.valid_until,
+            rotate_after: exchanged_key.rotate_after,
+            rekey_period: exchanged_key.rekey_period,
             last_rekey: now,
             last_rotation_attempt: TimestampInSeconds(0),
             rekey_counter: 0,
@@ -219,89 +222,13 @@ impl KafkaKeyExchangeControllerImpl {
             .producer_topic_encryptor_map
             .insert(topic_name.to_string(), encryption_key);
 
+        let encryption_key = inner
+            .producer_topic_encryptor_map
+            .get(topic_name)
+            .expect("key should be present");
+
         info!("Successfully exchanged new key with {destination} for topic {topic_name}");
-        Ok(producer_encryptor_address)
-    }
-
-    async fn validate_consumer_credentials(
-        inner: &MutexGuard<'_, InnerSecureChannelController>,
-        entry: &SecureChannelRegistryEntry,
-    ) -> Result<()> {
-        let authorized = inner
-            .consumer_policy_access_control
-            .is_identity_authorized(entry.their_id())
-            .await?;
-        if authorized {
-            Ok(())
-        } else {
-            Err(Error::new(
-                Origin::Transport,
-                Kind::Invalid,
-                format!(
-                    "unauthorized secure channel for consumer with identifier {}",
-                    entry.their_id()
-                ),
-            ))
-        }
-    }
-
-    /// Returns the secure channel entry for the consumer decryptor address and validate it
-    /// against the producer manual policy.
-    pub(crate) async fn get_or_load_secure_channel_decryptor_api_address_for(
-        &self,
-        ctx: &Context,
-        decryptor_remote_address: &Address,
-    ) -> Result<Address> {
-        let inner = self.inner.lock().await;
-        let (decryptor_api_address, their_identifier) = match inner
-            .secure_channels
-            .secure_channel_registry()
-            .get_channel_by_decryptor_address(decryptor_remote_address)
-        {
-            Some(entry) => (
-                entry.decryptor_api_address().clone(),
-                entry.their_id().clone(),
-            ),
-            None => {
-                match inner
-                    .secure_channels
-                    .start_persisted_secure_channel_decryptor(ctx, decryptor_remote_address)
-                    .await
-                {
-                    Ok(sc) => (
-                        sc.decryptor_api_address().clone(),
-                        sc.their_identifier().clone(),
-                    ),
-                    Err(e) => {
-                        return Err(Error::new(
-                            Origin::Channel,
-                            Kind::Unknown,
-                            format!(
-                                "secure channel decryptor {} can not be retrieved: {e:?}",
-                                decryptor_remote_address.address()
-                            ),
-                        ));
-                    }
-                }
-            }
-        };
-
-        let authorized = inner
-            .producer_policy_access_control
-            .is_identity_authorized(&their_identifier)
-            .await?;
-
-        if authorized {
-            Ok(decryptor_api_address)
-        } else {
-            Err(Error::new(
-                Origin::Transport,
-                Kind::Invalid,
-                format!(
-                    "unauthorized secure channel for producer with identifier {}",
-                    their_identifier
-                ),
-            ))
-        }
+        debug!("Exchanged key: {encryption_key:?}");
+        Ok(encryption_key)
     }
 }

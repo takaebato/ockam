@@ -10,6 +10,8 @@ pub enum EncryptionRequest {
     Encrypt(Vec<u8>),
     /// Trigger a manual rekey
     Rekey,
+    /// Derive new key
+    DeriveNewKey,
 }
 
 /// Response type for `EncryptorWorker` API Address
@@ -23,7 +25,17 @@ pub enum EncryptionResponse {
 
 /// Request type for `Decryptor` API Address (the `Decryptor` is accessible through the `HandshakeWorker`)
 #[derive(Serialize, Deserialize, Message)]
-pub struct DecryptionRequest(pub Vec<u8>, pub Option<u16>);
+pub enum DecryptionRequest {
+    /// Decrypt data
+    Decrypt {
+        /// Ciphertext to decrypt
+        ciphertext: Vec<u8>,
+        /// Rekey counter
+        rekey_counter: Option<u16>,
+    },
+    /// Derive new key
+    DeriveNewKey,
+}
 
 /// Response type for `Decryptor` API Address (the `Decryptor` is accessible through the `HandshakeWorker`)
 #[derive(Serialize, Deserialize, Message)]

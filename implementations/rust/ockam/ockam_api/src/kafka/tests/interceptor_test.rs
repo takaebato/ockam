@@ -314,21 +314,12 @@ async fn setup_only_worker(context: &mut Context, handle: &NodeManagerHandle) ->
         Some(authority_identifier.clone()),
     );
 
-    let producer_policy_access_control = policies.make_policy_access_control(
-        secure_channels.identities().identities_attributes(),
-        Resource::new("arbitrary-resource-name", ResourceType::KafkaProducer),
-        Action::HandleMessage,
-        Env::new(),
-        Some(authority_identifier.clone()),
-    );
-
     let secure_channel_controller = KafkaKeyExchangeControllerImpl::new(
         (*handle.node_manager).clone(),
-        secure_channels,
+        secure_channels.vault().encryption_at_rest_vault,
         ConsumerResolution::ViaRelay(MultiAddr::default()),
         ConsumerPublishing::None,
         consumer_policy_access_control,
-        producer_policy_access_control,
     );
 
     PortalInterceptorWorker::create_inlet_interceptor(
@@ -405,23 +396,12 @@ async fn kafka_portal_worker__metadata_exchange__response_changed(
         )
         .await?;
 
-    let producer_policy_access_control = handle
-        .node_manager
-        .policy_access_control(
-            Some(project_authority.clone()),
-            Resource::new("arbitrary-resource-name", ResourceType::KafkaProducer),
-            Action::HandleMessage,
-            None,
-        )
-        .await?;
-
     let secure_channel_controller = KafkaKeyExchangeControllerImpl::new(
         (*handle.node_manager).clone(),
-        handle.secure_channels.clone(),
+        handle.secure_channels.vault().encryption_at_rest_vault,
         ConsumerResolution::ViaRelay(MultiAddr::default()),
         ConsumerPublishing::None,
         consumer_policy_access_control,
-        producer_policy_access_control,
     );
 
     let inlet_map = KafkaInletController::new(

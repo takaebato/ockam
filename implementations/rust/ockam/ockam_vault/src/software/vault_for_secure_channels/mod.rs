@@ -18,9 +18,12 @@ cfg_if! {
     }
 }
 
+mod common;
 mod types;
+mod vault_for_encryption_at_rest;
 #[allow(clippy::module_inception)]
 mod vault_for_secure_channels;
 
 pub use types::*;
+pub use vault_for_encryption_at_rest::*;
 pub use vault_for_secure_channels::*;

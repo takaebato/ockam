@@ -193,6 +193,7 @@ impl NodeManager {
                     match info.kind() {
                         KafkaServiceKind::Inlet => DefaultAddress::KAFKA_INLET,
                         KafkaServiceKind::Outlet => DefaultAddress::KAFKA_OUTLET,
+                        KafkaServiceKind::Custodian => DefaultAddress::KAFKA_CUSTODIAN,
                     },
                 ))
             });

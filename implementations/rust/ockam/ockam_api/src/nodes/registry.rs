@@ -99,6 +99,7 @@ pub(crate) struct RemoteProxyVaultInfo {}
 pub enum KafkaServiceKind {
     Inlet,
     Outlet,
+    Custodian,
 }
 
 impl Display for KafkaServiceKind {
@@ -106,6 +107,7 @@ impl Display for KafkaServiceKind {
         match self {
             KafkaServiceKind::Inlet => write!(f, "inlet"),
             KafkaServiceKind::Outlet => write!(f, "outlet"),
+            KafkaServiceKind::Custodian => write!(f, "custodian"),
         }
     }
 }

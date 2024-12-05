@@ -1,9 +1,8 @@
 use sha2::{Digest, Sha256};
 use tracing::instrument;
 
-use ockam_core::compat::boxed::Box;
 use ockam_core::compat::collections::BTreeMap;
-use ockam_core::compat::rand::{thread_rng, RngCore};
+use ockam_core::compat::rand::thread_rng;
 use ockam_core::compat::sync::{Arc, RwLock};
 use ockam_core::compat::vec::{vec, Vec};
 use ockam_core::{async_trait, Result};
@@ -13,16 +12,17 @@ use crate::storage::SecretsRepository;
 #[cfg(feature = "storage")]
 use crate::storage::SecretsSqlxDatabase;
 
+use super::make_aes;
+use crate::software::vault_for_secure_channels::common::{
+    generate_aead_handle, generate_buffer_handle,
+};
+use crate::software::vault_for_secure_channels::types::AES_GCM_TAGSIZE;
 use crate::{
     AeadSecret, AeadSecretKeyHandle, BufferSecret, HKDFNumberOfOutputs, HandleToSecret, HashOutput,
     HkdfOutput, SecretBufferHandle, SoftwareVaultForVerifyingSignatures, VaultError,
     VaultForSecureChannels, X25519PublicKey, X25519SecretKey, X25519SecretKeyHandle,
     AEAD_SECRET_LENGTH,
 };
-
-use super::make_aes;
-
-const AES_GCM_TAGSIZE: usize = 16;
 
 /// [`SecureChannelVault`] implementation using software
 pub struct SoftwareVaultForSecureChannels {
@@ -136,27 +136,6 @@ impl SoftwareVaultForSecureChannels {
         x25519_dalek::PublicKey::from(public_key.0)
     }
 
-    fn generate_random_handle() -> HandleToSecret {
-        // NOTE: Buffer and Aes secrets in the system are ephemeral and it should be fine,
-        // that every time we import the same secret - it gets different Handle value.
-        // However, if we decide to have persistent Buffer or Aes secrets, that should be
-        // changed (probably to hash value of the secret)
-        let mut rng = thread_rng();
-        let mut rand = vec![0u8; 8];
-        rng.fill_bytes(&mut rand);
-        HandleToSecret::new(rand)
-    }
-
-    fn generate_buffer_handle() -> SecretBufferHandle {
-        SecretBufferHandle(Self::generate_random_handle())
-    }
-
-    fn generate_aead_handle() -> AeadSecretKeyHandle {
-        use crate::Aes256GcmSecretKeyHandle;
-        let handle = Self::generate_random_handle();
-        AeadSecretKeyHandle(Aes256GcmSecretKeyHandle(handle))
-    }
-
     fn ecdh_internal(
         secret: X25519SecretKey,
         peer_public_key: X25519PublicKey,
@@ -174,7 +153,7 @@ impl SoftwareVaultForSecureChannels {
     }
 
     fn import_buffer_secret_impl(&self, secret: BufferSecret) -> SecretBufferHandle {
-        let handle = Self::generate_buffer_handle();
+        let handle = generate_buffer_handle();
 
         self.ephemeral_buffer_secrets
             .write()
@@ -450,7 +429,7 @@ impl VaultForSecureChannels for SoftwareVaultForSecureChannels {
             .map_err(|_| VaultError::InvalidSecretLength)?;
         let secret = AeadSecret(secret);
 
-        let handle = Self::generate_aead_handle();
+        let handle = generate_aead_handle();
 
         self.ephemeral_aead_secrets
             .write()

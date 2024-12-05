@@ -71,3 +71,6 @@ cfg_if! {
         // TODO
     }
 }
+
+/// AES GCM tag size
+pub const AES_GCM_TAGSIZE: usize = 16;

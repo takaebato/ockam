@@ -294,6 +294,7 @@ pub enum PluralTerm {
     TcpOutlet,
     KafkaInlet,
     KafkaOutlet,
+    KafkaCustodian,
     Policy,
     Member,
 }
@@ -313,6 +314,7 @@ impl PluralTerm {
             PluralTerm::TcpOutlet => "tcp outlet",
             PluralTerm::KafkaInlet => "kafka inlet",
             PluralTerm::KafkaOutlet => "kafka outlet",
+            PluralTerm::KafkaCustodian => "kafka custodian",
             PluralTerm::Policy => "policy",
             PluralTerm::Member => "member",
         }
@@ -332,6 +334,7 @@ impl PluralTerm {
             PluralTerm::TcpOutlet => "tcp outlets",
             PluralTerm::KafkaInlet => "kafka inlets",
             PluralTerm::KafkaOutlet => "kafka outlets",
+            PluralTerm::KafkaCustodian => "kafka custodians",
             PluralTerm::Policy => "policies",
             PluralTerm::Member => "members",
         }

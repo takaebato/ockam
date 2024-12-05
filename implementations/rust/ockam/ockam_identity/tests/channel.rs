@@ -16,7 +16,8 @@ use ockam_identity::{
 };
 use ockam_node::{Context, MessageReceiveOptions, WorkerBuilder};
 use ockam_vault::{
-    SoftwareVaultForSecureChannels, SoftwareVaultForSigning, SoftwareVaultForVerifyingSignatures,
+    SoftwareVaultForAtRestEncryption, SoftwareVaultForSecureChannels, SoftwareVaultForSigning,
+    SoftwareVaultForVerifyingSignatures,
 };
 
 #[ockam_macros::test]
@@ -486,7 +487,10 @@ async fn test_channel_api(ctx: &mut Context) -> Result<()> {
     let decrypted_alice: DecryptionResponse = ctx
         .send_and_receive(
             route![alice_channel_data.decryptor_api_address().clone()],
-            DecryptionRequest(encrypted_bob, None),
+            DecryptionRequest::Decrypt {
+                ciphertext: encrypted_bob,
+                rekey_counter: None,
+            },
         )
         .await?;
     let decrypted_alice = match decrypted_alice {
@@ -497,7 +501,10 @@ async fn test_channel_api(ctx: &mut Context) -> Result<()> {
     let decrypted_bob: DecryptionResponse = ctx
         .send_and_receive(
             route![bob_channel_data.decryptor_api_address().clone()],
-            DecryptionRequest(encrypted_alice, None),
+            DecryptionRequest::Decrypt {
+                ciphertext: encrypted_alice,
+                rekey_counter: None,
+            },
         )
         .await?;
     let decrypted_bob = match decrypted_bob {
@@ -915,6 +922,7 @@ async fn test_channel_delete_ephemeral_keys(ctx: &mut Context) -> Result<()> {
         alice_sc_vault.clone(),
         SoftwareVaultForSigning::create().await?,
         SoftwareVaultForVerifyingSignatures::create(),
+        SoftwareVaultForAtRestEncryption::create().await?,
     );
 
     let bob_identity_vault = SoftwareVaultForSigning::create().await?;
@@ -924,6 +932,7 @@ async fn test_channel_delete_ephemeral_keys(ctx: &mut Context) -> Result<()> {
         bob_sc_vault.clone(),
         SoftwareVaultForSigning::create().await?,
         SoftwareVaultForVerifyingSignatures::create(),
+        SoftwareVaultForAtRestEncryption::create().await?,
     );
 
     let secure_channels_alice = SecureChannels::builder()

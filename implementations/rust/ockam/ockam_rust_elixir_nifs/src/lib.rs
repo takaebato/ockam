@@ -34,8 +34,8 @@ use ockam_identity::{
 };
 use ockam_vault::{
     EdDSACurve25519SecretKey, HandleToSecret, SigningKeyType, SigningSecret,
-    SigningSecretKeyHandle, SoftwareVaultForSecureChannels, SoftwareVaultForSigning,
-    X25519PublicKey, X25519SecretKey,
+    SigningSecretKeyHandle, SoftwareVaultForAtRestEncryption, SoftwareVaultForSecureChannels,
+    SoftwareVaultForSigning, X25519PublicKey, X25519SecretKey,
 };
 use ockam_vault_aws::{AwsKmsConfig, AwsSigningVault, InitialKeysDiscovery};
 use rustler::{Atom, Binary, Env, Error, NewBinary, NifResult};
@@ -49,6 +49,8 @@ lazy_static! {
     static ref IDENTITY_MEMORY_VAULT: RwLock<Option<Arc<SoftwareVaultForSigning>>> =
         RwLock::new(None);
     static ref SECURE_CHANNEL_MEMORY_VAULT: RwLock<Option<Arc<SoftwareVaultForSecureChannels>>> =
+        RwLock::new(None);
+    static ref ENCRYPTION_AT_REST_VAULT: RwLock<Option<Arc<SoftwareVaultForAtRestEncryption>>> =
         RwLock::new(None);
 }
 
@@ -111,8 +113,10 @@ fn load_memory_vault() -> bool {
     block_future(async move {
         let identity_vault = SoftwareVaultForSigning::create().await.unwrap();
         let secure_channel_vault = SoftwareVaultForSecureChannels::create().await.unwrap();
+        let encryption_at_rest_vault = SoftwareVaultForAtRestEncryption::create().await.unwrap();
         *IDENTITY_MEMORY_VAULT.write().unwrap() = Some(identity_vault.clone());
         *SECURE_CHANNEL_MEMORY_VAULT.write().unwrap() = Some(secure_channel_vault.clone());
+        *ENCRYPTION_AT_REST_VAULT.write().unwrap() = Some(encryption_at_rest_vault.clone());
         let builder = ockam_identity::Identities::builder()
             .await
             .unwrap()
@@ -121,6 +125,7 @@ fn load_memory_vault() -> bool {
                 secure_channel_vault,
                 Vault::create_credential_vault().await.unwrap(),
                 Vault::create_verifying_vault(),
+                encryption_at_rest_vault,
             ));
         *IDENTITIES.write().unwrap() = Some(builder.build());
     });
@@ -131,6 +136,11 @@ fn load_memory_vault() -> bool {
 fn setup_aws_kms(key_ids: Vec<String>) -> NifResult<bool> {
     let secure_channel_vault = match SECURE_CHANNEL_MEMORY_VAULT.read().unwrap().clone() {
         Some(secure_channel_vault) => secure_channel_vault,
+        None => return Err(Error::Term(Box::new(atoms::attestation_decode_error()))),
+    };
+
+    let encryption_at_rest_vault = match ENCRYPTION_AT_REST_VAULT.read().unwrap().clone() {
+        Some(encryption_at_rest_vault) => encryption_at_rest_vault,
         None => return Err(Error::Term(Box::new(atoms::attestation_decode_error()))),
     };
 
@@ -156,6 +166,7 @@ fn setup_aws_kms(key_ids: Vec<String>) -> NifResult<bool> {
                         secure_channel_vault,
                         Vault::create_credential_vault().await.unwrap(),
                         Vault::create_verifying_vault(),
+                        encryption_at_rest_vault,
                     ));
                 *IDENTITIES.write().unwrap() = Some(builder.build());
                 Ok(true)

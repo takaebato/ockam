@@ -90,7 +90,10 @@ async fn test_key_exchange_only(ctx: &mut Context) -> ockam_core::Result<()> {
     let DecryptionResponse::Ok(decrypted_msg1_alice) = ctx
         .send_and_receive(
             route![bob_channel.decryptor_api_address().clone()],
-            DecryptionRequest(encrypted_msg1_alice, None),
+            DecryptionRequest::Decrypt {
+                ciphertext: encrypted_msg1_alice,
+                rekey_counter: None,
+            },
         )
         .await?
     else {
@@ -100,7 +103,10 @@ async fn test_key_exchange_only(ctx: &mut Context) -> ockam_core::Result<()> {
     let DecryptionResponse::Ok(decrypted_msg2_alice) = ctx
         .send_and_receive(
             route![bob_channel.decryptor_api_address().clone()],
-            DecryptionRequest(encrypted_msg2_alice, None),
+            DecryptionRequest::Decrypt {
+                ciphertext: encrypted_msg2_alice,
+                rekey_counter: None,
+            },
         )
         .await?
     else {
@@ -110,7 +116,10 @@ async fn test_key_exchange_only(ctx: &mut Context) -> ockam_core::Result<()> {
     let DecryptionResponse::Ok(decrypted_msg1_bob) = ctx
         .send_and_receive(
             route![alice_channel.decryptor_api_address().clone()],
-            DecryptionRequest(encrypted_msg1_bob, None),
+            DecryptionRequest::Decrypt {
+                ciphertext: encrypted_msg1_bob,
+                rekey_counter: None,
+            },
         )
         .await?
     else {
@@ -120,7 +129,10 @@ async fn test_key_exchange_only(ctx: &mut Context) -> ockam_core::Result<()> {
     let DecryptionResponse::Ok(decrypted_msg2_bob) = ctx
         .send_and_receive(
             route![alice_channel.decryptor_api_address().clone()],
-            DecryptionRequest(encrypted_msg2_bob, None),
+            DecryptionRequest::Decrypt {
+                ciphertext: encrypted_msg2_bob,
+                rekey_counter: None,
+            },
         )
         .await?
     else {
@@ -326,7 +338,10 @@ fn test_persistence() -> ockam_core::Result<()> {
                 let DecryptionResponse::Ok(decrypted_msg1_alice) = ctx2
                     .send_and_receive(
                         route![data.decryptor_api_address_bob.clone()],
-                        DecryptionRequest(data.encrypted_msg1_alice, None),
+                        DecryptionRequest::Decrypt {
+                            ciphertext: data.encrypted_msg1_alice,
+                            rekey_counter: None,
+                        },
                     )
                     .await?
                 else {
@@ -336,7 +351,10 @@ fn test_persistence() -> ockam_core::Result<()> {
                 let DecryptionResponse::Ok(decrypted_msg2_alice) = ctx2
                     .send_and_receive(
                         route![data.decryptor_api_address_bob.clone()],
-                        DecryptionRequest(data.encrypted_msg2_alice, None),
+                        DecryptionRequest::Decrypt {
+                            ciphertext: data.encrypted_msg2_alice,
+                            rekey_counter: None,
+                        },
                     )
                     .await?
                 else {
@@ -346,7 +364,10 @@ fn test_persistence() -> ockam_core::Result<()> {
                 let DecryptionResponse::Ok(decrypted_msg1_bob) = ctx2
                     .send_and_receive(
                         route![data.decryptor_api_address_alice.clone()],
-                        DecryptionRequest(data.encrypted_msg1_bob, None),
+                        DecryptionRequest::Decrypt {
+                            ciphertext: data.encrypted_msg1_bob,
+                            rekey_counter: None,
+                        },
                     )
                     .await?
                 else {
@@ -356,7 +377,10 @@ fn test_persistence() -> ockam_core::Result<()> {
                 let DecryptionResponse::Ok(decrypted_msg2_bob) = ctx2
                     .send_and_receive(
                         route![data.decryptor_api_address_alice.clone()],
-                        DecryptionRequest(data.encrypted_msg2_bob, None),
+                        DecryptionRequest::Decrypt {
+                            ciphertext: data.encrypted_msg2_bob,
+                            rekey_counter: None,
+                        },
                     )
                     .await?
                 else {

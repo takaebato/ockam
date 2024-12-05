@@ -2,12 +2,12 @@ use bytes::BytesMut;
 use kafka_protocol::messages::ApiKey;
 use kafka_protocol::protocol::buf::NotEnoughBytesError;
 use minicbor::{CborLen, Decode, Encode};
+use ockam_core::async_trait;
 use ockam_core::compat::{
     collections::HashMap,
     fmt::Debug,
     sync::{Arc, Mutex},
 };
-use ockam_core::{async_trait, Address};
 use ockam_node::Context;
 
 pub(crate) mod outlet;
@@ -147,12 +147,26 @@ impl PortalInterceptor for KafkaMessageInterceptorWrapper {
 #[rustfmt::skip]
 /// Wraps the content within every record batch
 pub(crate) struct KafkaEncryptedContent {
-    /// The secure channel identifier used to encrypt the content
-    #[n(0)] pub consumer_decryptor_address: Address,
-    /// The encrypted content
-    #[n(1)] pub content: Vec<u8>,
+    /// The secret key handle used to encrypt the content
+    #[n(0)] pub secret_key_handler: Vec<u8>,
     /// Number of times rekey was performed before encrypting the content
-    #[n(2)] pub rekey_counter: u16,
+    #[n(1)] pub rekey_counter: u16,
+    /// The encrypted content
+    #[n(2)] pub content: Vec<u8>,
+
+    // TODO: the custodian should sign off information about the key with a purpose key:
+    //      - secret_key_handle
+    //      - producer identifier
+    //      - key creation timestamp
+
+    // TODO: the producer should use AAD to sign off:
+    //      - topic name
+    //      - record creation timestamp
+    //
+    // the topic name will protect against replay attacks to other topics
+    // the timestamp may protect against replay attacks in the same topic1,
+    // but it isn't clear how to properly validate atm (there is no simple way to
+    // get an expected timestamp range)
 }
 
 /// By default, kafka supports up to 1MB messages. 16MB is the maximum suggested

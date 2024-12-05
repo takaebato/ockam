@@ -1,10 +1,11 @@
 use crate::kafka::protocol_aware::KafkaEncryptedContent;
 use minicbor::{CborLen, Decode, Encode};
-use ockam_core::{async_trait, Address};
+use ockam_core::async_trait;
 use ockam_multiaddr::MultiAddr;
 use ockam_node::Context;
 
 pub(crate) mod controller;
+pub(crate) mod listener;
 mod secure_channels;
 
 /// Describe how to reach the consumer node: either directly or through a relay
@@ -43,13 +44,10 @@ pub(crate) trait KafkaKeyExchangeController: Send + Sync + 'static {
 
     /// Decrypts the content based on the consumer decryptor address
     /// the secure channel is expected to be already initialized.
-    async fn decrypt_content(
+    async fn decrypt_content<'a>(
         &self,
-        context: &mut Context,
-        consumer_decryptor_address: &Address,
-        rekey_counter: u16,
-        encrypted_content: Vec<u8>,
-    ) -> ockam_core::Result<Vec<u8>>;
+        kafka_encrypted_content: &'a mut KafkaEncryptedContent,
+    ) -> ockam_core::Result<&'a [u8]>;
 
     /// Starts relays in the orchestrator for each topic name, should be used only by the consumer.
     /// does nothing if they were already created, but fails it they already exist.

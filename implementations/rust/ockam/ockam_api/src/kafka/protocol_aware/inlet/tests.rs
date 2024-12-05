@@ -15,7 +15,7 @@ use kafka_protocol::records::{
     Compression, Record, RecordBatchDecoder, RecordBatchEncoder, RecordEncodeOptions, TimestampType,
 };
 use minicbor::{Decoder, Encoder};
-use ockam_core::{async_trait, Address};
+use ockam_core::async_trait;
 use ockam_node::Context;
 use serde_json::json;
 use std::sync::Arc;
@@ -36,20 +36,17 @@ impl KafkaKeyExchangeController for MockKafkaKeyExchangeController {
         let mut new_content = ENCRYPTED_PREFIX.to_vec();
         new_content.extend_from_slice(&content);
         Ok(KafkaEncryptedContent {
-            consumer_decryptor_address: Address::from_string("mock"),
+            secret_key_handler: "mock".as_bytes().to_vec(),
             content: new_content,
             rekey_counter: u16::MAX,
         })
     }
 
-    async fn decrypt_content(
+    async fn decrypt_content<'a>(
         &self,
-        _context: &mut Context,
-        _consumer_decryptor_address: &Address,
-        _rekey_counter: u16,
-        encrypted_content: Vec<u8>,
-    ) -> ockam_core::Result<Vec<u8>> {
-        Ok(encrypted_content[PREFIX_LEN..].to_vec())
+        kafka_encrypted_content: &'a mut KafkaEncryptedContent,
+    ) -> ockam_core::Result<&'a [u8]> {
+        Ok(&kafka_encrypted_content.content[PREFIX_LEN..])
     }
 
     async fn publish_consumer(
@@ -175,8 +172,8 @@ pub fn decode_field_value(value: String) -> serde_json::Value {
     let value = hex::decode(value).unwrap();
     let encrypted_content: KafkaEncryptedContent = Decoder::new(value.as_ref()).decode().unwrap();
     assert_eq!(
-        encrypted_content.consumer_decryptor_address,
-        Address::from_string("mock")
+        encrypted_content.secret_key_handler,
+        "mock".as_bytes().to_vec()
     );
 
     let encrypted_tag =
@@ -196,7 +193,7 @@ pub fn encode_field_value(value: serde_json::Value) -> String {
     let mut encoder = Encoder::new(&mut write_buffer);
     encoder
         .encode(KafkaEncryptedContent {
-            consumer_decryptor_address: Address::from_string("mock"),
+            secret_key_handler: "mock".as_bytes().to_vec(),
             content: encrypted_content,
             rekey_counter: u16::MAX,
         })

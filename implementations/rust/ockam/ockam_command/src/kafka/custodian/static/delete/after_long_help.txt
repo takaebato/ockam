@@ -1,0 +1,7 @@
+```sh
+# To delete a kafka custodian on the default node
+$ ockam kafka-custodian delete kcaddr
+
+# To delete a kafka custodian on a specific node
+$ ockam kafka-custodian delete kcaddr --at n
+```

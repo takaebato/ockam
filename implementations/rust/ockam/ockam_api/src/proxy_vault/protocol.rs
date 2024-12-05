@@ -121,6 +121,14 @@ impl Worker for Server {
                 )
                 .await?
             }
+
+            "encryption_at_rest_vault" => {
+                vault_for_encryption_at_rest::handle_request(
+                    self.vault.encryption_at_rest_vault.as_ref(),
+                    payload,
+                )
+                .await?
+            }
             _ => {
                 warn!("Unknown address: {}, ignoring request", onward_address);
                 return Ok(());
@@ -1168,6 +1176,187 @@ pub mod vault_for_verify_signatures {
     }
 }
 
+pub mod vault_for_encryption_at_rest {
+    use crate::proxy_vault::protocol::{ProxyError, SpecificClient};
+    use minicbor::{CborLen, Decode, Encode};
+    use ockam_core::{async_trait, cbor_encode_preallocate};
+    use ockam_vault::{AeadSecretKeyHandle, VaultForEncryptionAtRest};
+
+    pub(super) async fn handle_request(
+        vault: &dyn VaultForEncryptionAtRest,
+        request: Vec<u8>,
+    ) -> ockam_core::Result<Vec<u8>> {
+        let request: Request = minicbor::decode(&request)?;
+        let response = match request {
+            Request::AeadEncrypt {
+                secret_key_handle,
+                mut plain_text,
+                aad,
+            } => {
+                trace!("aead_encrypt request for {secret_key_handle:?}");
+                let result = vault
+                    .aead_encrypt(&secret_key_handle, &mut plain_text, &aad)
+                    .await;
+                Response::AeadEncrypt(result.map(|_| plain_text).map_err(Into::into))
+            }
+            Request::AeadDecrypt {
+                secret_key_handle,
+                rekey_counter,
+                mut cipher_text,
+                aad,
+            } => {
+                trace!("aead_decrypt request for {secret_key_handle:?}");
+                let result = vault
+                    .aead_decrypt(&secret_key_handle, rekey_counter, &mut cipher_text, &aad)
+                    .await;
+                Response::AeadDecrypt(result.map(|slice| slice.to_vec()).map_err(Into::into))
+            }
+            Request::RekeyAndDelete { secret_key_handle } => {
+                trace!("rekey_and_delete request for {secret_key_handle:?}");
+                let result = vault.rekey_and_delete(&secret_key_handle).await;
+                Response::RekeyAndDelete(result.map_err(Into::into))
+            }
+            Request::ImportAeadKey { secret } => {
+                trace!("import_aead_key request");
+                let result = vault.import_aead_key(secret).await;
+                Response::ImportAeadKey(result.map_err(Into::into))
+            }
+        };
+        cbor_encode_preallocate(response)
+    }
+
+    #[derive(Encode, Decode, CborLen)]
+    #[rustfmt::skip]
+    enum Request {
+        #[n(0)] AeadEncrypt {
+            #[n(0)] secret_key_handle: AeadSecretKeyHandle,
+            #[n(1)] plain_text: Vec<u8>,
+            #[n(2)] aad: Vec<u8>,
+        },
+        #[n(1)] AeadDecrypt {
+            #[n(0)] secret_key_handle: AeadSecretKeyHandle,
+            #[n(1)] rekey_counter: u16,
+            #[n(2)] cipher_text: Vec<u8>,
+            #[n(3)] aad: Vec<u8>,
+        },
+        #[n(2)] RekeyAndDelete {
+            #[n(0)] secret_key_handle: AeadSecretKeyHandle,
+        },
+        #[n(3)] ImportAeadKey {
+            #[n(0)] secret: Vec<u8>,
+        },
+    }
+
+    #[derive(Encode, Decode, CborLen)]
+    #[rustfmt::skip]
+    enum Response {
+        #[n(0)] AeadEncrypt(#[n(0)] Result<Vec<u8>, ProxyError>),
+        #[n(1)] AeadDecrypt(#[n(0)] Result<Vec<u8>, ProxyError>),
+        #[n(2)] RekeyAndDelete(#[n(0)] Result<AeadSecretKeyHandle, ProxyError>),
+        #[n(3)] ImportAeadKey(#[n(0)] Result<AeadSecretKeyHandle, ProxyError>),
+    }
+
+    #[async_trait]
+    impl VaultForEncryptionAtRest for SpecificClient {
+        async fn aead_encrypt(
+            &self,
+            secret_key_handle: &AeadSecretKeyHandle,
+            plain_text: &mut [u8],
+            aad: &[u8],
+        ) -> ockam_core::Result<()> {
+            trace!("sending aead_encrypt request for {secret_key_handle:?}");
+            let response: Response = self
+                .send_and_receive(Request::AeadEncrypt {
+                    secret_key_handle: secret_key_handle.clone(),
+                    plain_text: plain_text.to_vec(),
+                    aad: aad.to_vec(),
+                })
+                .await?;
+
+            match response {
+                Response::AeadEncrypt(result) => {
+                    let result = result?;
+                    if result.len() != plain_text.len() {
+                        return Err(ProxyError::Protocol)?;
+                    }
+                    plain_text.copy_from_slice(result.as_slice());
+                    Ok(())
+                }
+                _ => Err(ProxyError::Protocol)?,
+            }
+        }
+
+        async fn aead_decrypt<'a>(
+            &self,
+            secret_key_handle: &AeadSecretKeyHandle,
+            rekey_counter: u16,
+            cipher_text: &'a mut [u8],
+            aad: &[u8],
+        ) -> ockam_core::Result<&'a mut [u8]> {
+            trace!("sending aead_decrypt request for {secret_key_handle:?}");
+            let response: Response = self
+                .send_and_receive(Request::AeadDecrypt {
+                    secret_key_handle: secret_key_handle.clone(),
+                    rekey_counter,
+                    cipher_text: cipher_text.to_vec(),
+                    aad: aad.to_vec(),
+                })
+                .await?;
+
+            let result = match response {
+                Response::AeadDecrypt(result) => {
+                    let result = result?;
+                    if cipher_text.len() < result.len() {
+                        return Err(ProxyError::Protocol)?;
+                    }
+                    let clear_text = cipher_text[..result.len()].as_mut();
+                    clear_text.copy_from_slice(result.as_slice());
+                    clear_text
+                }
+                _ => Err(ProxyError::Protocol)?,
+            };
+
+            Ok(result)
+        }
+
+        async fn rekey_and_delete(
+            &self,
+            secret_key_handle: &AeadSecretKeyHandle,
+        ) -> ockam_core::Result<AeadSecretKeyHandle> {
+            trace!("sending rekey_and_delete request for {secret_key_handle:?}");
+            let response: Response = self
+                .send_and_receive(Request::RekeyAndDelete {
+                    secret_key_handle: secret_key_handle.clone(),
+                })
+                .await?;
+
+            let result = match response {
+                Response::RekeyAndDelete(result) => result?,
+                _ => Err(ProxyError::Protocol)?,
+            };
+
+            Ok(result)
+        }
+
+        async fn import_aead_key(
+            &self,
+            secret: Vec<u8>,
+        ) -> ockam_core::Result<AeadSecretKeyHandle> {
+            trace!("sending import_aead_key request");
+            let response: Response = self
+                .send_and_receive(Request::ImportAeadKey { secret })
+                .await?;
+
+            let result = match response {
+                Response::ImportAeadKey(result) => result?,
+                _ => Err(ProxyError::Protocol)?,
+            };
+
+            Ok(result)
+        }
+    }
+}
+
 pub async fn create_vault(
     context: Context,
     route: MultiAddr,
@@ -1184,6 +1373,7 @@ pub async fn create_vault(
         client.create_for_destination("secure_channel_vault"),
         client.create_for_destination("credential_vault"),
         client.create_for_destination("verifying_vault"),
+        client.create_for_destination("encryption_at_rest_vault"),
     )
 }
 

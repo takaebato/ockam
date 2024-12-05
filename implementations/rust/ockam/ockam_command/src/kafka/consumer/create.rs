@@ -53,6 +53,7 @@ impl CreateCommand {
             inlet_policy_expression: None,
             consumer_policy_expression: None,
             producer_policy_expression: None,
+            vault: None,
         }
         .run(opts)
     }

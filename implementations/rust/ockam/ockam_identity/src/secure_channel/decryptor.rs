@@ -80,18 +80,28 @@ impl DecryptorHandler {
         let return_route = msg.return_route;
 
         // Decode raw payload binary
-        let mut request = DecryptionRequest::decode(&msg.payload)?;
-        let decrypted_payload = if let Some(rekey_counter) = request.1 {
-            self.decryptor
-                .decrypt_with_rekey_counter(&mut request.0, rekey_counter)
-                .await
-        } else {
-            self.decryptor.decrypt(request.0.as_mut_slice()).await
-        };
+        let request = DecryptionRequest::decode(&msg.payload)?;
+        let response = match request {
+            DecryptionRequest::Decrypt {
+                mut ciphertext,
+                rekey_counter,
+            } => {
+                let decrypted_payload = if let Some(rekey_counter) = rekey_counter {
+                    self.decryptor
+                        .decrypt_with_rekey_counter(&mut ciphertext, rekey_counter)
+                        .await
+                } else {
+                    self.decryptor.decrypt(&mut ciphertext).await
+                };
 
-        let response = match decrypted_payload {
-            Ok((payload, _nonce)) => DecryptionResponse::Ok(payload.to_vec()),
-            Err(err) => DecryptionResponse::Err(err),
+                match decrypted_payload {
+                    Ok((payload, _nonce)) => DecryptionResponse::Ok(payload.to_vec()),
+                    Err(err) => DecryptionResponse::Err(err),
+                }
+            }
+            DecryptionRequest::DeriveNewKey => {
+                todo!()
+            }
         };
 
         // Send reply to the caller

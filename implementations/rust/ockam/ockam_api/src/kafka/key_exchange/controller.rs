@@ -3,23 +3,25 @@ use crate::kafka::protocol_aware::KafkaEncryptedContent;
 use crate::kafka::{ConsumerPublishing, ConsumerResolution};
 use crate::nodes::models::relay::ReturnTiming;
 use crate::nodes::NodeManager;
-use ockam::identity::{
-    utils, DecryptionRequest, DecryptionResponse, EncryptionRequest, EncryptionResponse,
-    SecureChannels, TimestampInSeconds,
-};
+use ockam::identity::{utils, TimestampInSeconds, AES_GCM_NONCE_LEN};
 use ockam_abac::PolicyAccessControl;
 use ockam_core::compat::clock::{Clock, ProductionClock};
 use ockam_core::compat::collections::{HashMap, HashSet};
 use ockam_core::errcode::{Kind, Origin};
-use ockam_core::{async_trait, route, Address, Error};
+use ockam_core::{async_trait, Error};
 use ockam_node::Context;
+use ockam_vault::{AeadSecretKeyHandle, HandleToSecret, VaultForEncryptionAtRest};
 use std::sync::{Arc, Weak};
 use time::Duration;
 use tokio::sync::Mutex;
 
+const AES_GCM_TAGSIZE: usize = 16;
+
 #[derive(Clone)]
 pub(crate) struct KafkaKeyExchangeControllerImpl {
     pub(crate) inner: Arc<Mutex<InnerSecureChannelController>>,
+    // outside, so we don't need to lock the inner when performing encryption/decryption
+    pub(crate) encryption_at_rest: Arc<dyn VaultForEncryptionAtRest>,
 }
 
 #[async_trait]
@@ -31,58 +33,44 @@ impl KafkaKeyExchangeController for KafkaKeyExchangeControllerImpl {
         content: Vec<u8>,
     ) -> ockam_core::Result<KafkaEncryptedContent> {
         let topic_key_handler = self.get_or_exchange_key(context, topic_name).await?;
-        let encryption_response: EncryptionResponse = context
-            .send_and_receive(
-                route![topic_key_handler.encryptor_api_address.clone()],
-                EncryptionRequest::Encrypt(content),
-            )
+
+        let content_str = String::from_utf8_lossy(&content);
+        debug!("Encrypting content for topic: {topic_name}, content: {content_str}");
+
+        let mut destination = vec![0; AES_GCM_NONCE_LEN + content.len() + AES_GCM_TAGSIZE];
+        destination[AES_GCM_NONCE_LEN..content.len() + AES_GCM_NONCE_LEN].copy_from_slice(&content);
+
+        let content_str = String::from_utf8_lossy(&destination);
+        debug!("Destination: {destination:? }, content: {content_str}");
+
+        self.encryption_at_rest
+            .aead_encrypt(&topic_key_handler.secret_key_handle, &mut destination, &[])
             .await?;
 
-        let encrypted_content = match encryption_response {
-            EncryptionResponse::Ok(p) => p,
-            EncryptionResponse::Err(cause) => {
-                warn!("Cannot encrypt kafka message");
-                return Err(cause);
-            }
-        };
-
         Ok(KafkaEncryptedContent {
-            content: encrypted_content,
-            consumer_decryptor_address: topic_key_handler.consumer_decryptor_address,
+            content: destination,
+            secret_key_handler: topic_key_handler.key_identifier_for_consumer,
             rekey_counter: topic_key_handler.rekey_counter,
         })
     }
 
-    async fn decrypt_content(
+    async fn decrypt_content<'a>(
         &self,
-        context: &mut Context,
-        consumer_decryptor_address: &Address,
-        rekey_counter: u16,
-        encrypted_content: Vec<u8>,
-    ) -> ockam_core::Result<Vec<u8>> {
-        let secure_channel_decryptor_api_address = self
-            .get_or_load_secure_channel_decryptor_api_address_for(
-                context,
-                consumer_decryptor_address,
+        kafka_encrypted_content: &'a mut KafkaEncryptedContent,
+    ) -> ockam_core::Result<&'a [u8]> {
+        let secret_key_handle = AeadSecretKeyHandle::new(HandleToSecret::new(
+            kafka_encrypted_content.secret_key_handler.clone(),
+        ));
+
+        Ok(self
+            .encryption_at_rest
+            .aead_decrypt(
+                &secret_key_handle,
+                kafka_encrypted_content.rekey_counter,
+                &mut kafka_encrypted_content.content,
+                &[],
             )
-            .await?;
-
-        let decrypt_response = context
-            .send_and_receive(
-                route![secure_channel_decryptor_api_address],
-                DecryptionRequest(encrypted_content, Some(rekey_counter)),
-            )
-            .await?;
-
-        let decrypted_content = match decrypt_response {
-            DecryptionResponse::Ok(p) => p,
-            DecryptionResponse::Err(cause) => {
-                error!("cannot decrypt kafka message: closing connection");
-                return Err(cause);
-            }
-        };
-
-        Ok(decrypted_content)
+            .await?)
     }
 
     async fn publish_consumer(
@@ -124,18 +112,21 @@ impl KafkaKeyExchangeController for KafkaKeyExchangeControllerImpl {
 #[derive(Debug, PartialEq)]
 pub(crate) struct TopicEncryptionKey {
     pub(crate) rekey_counter: u16,
-    pub(crate) encryptor_api_address: Address,
-    pub(crate) consumer_decryptor_address: Address,
+    pub(crate) secret_key_handle: AeadSecretKeyHandle,
+    pub(crate) key_identifier_for_consumer: Vec<u8>,
 }
 
 const ROTATION_RETRY_DELAY: Duration = Duration::minutes(5);
+
+#[derive(Debug)]
 pub(crate) struct TopicEncryptionKeyState {
-    pub(crate) producer_encryptor_address: Address,
+    pub(crate) secret_key_handle: AeadSecretKeyHandle,
+    pub(crate) key_identifier_for_consumer: Vec<u8>,
     pub(crate) valid_until: TimestampInSeconds,
     pub(crate) rotate_after: TimestampInSeconds,
     pub(crate) last_rekey: TimestampInSeconds,
     pub(crate) rekey_counter: u16,
-    pub(crate) rekey_period: Duration,
+    pub(crate) rekey_period: std::time::Duration,
     pub(crate) last_rotation_attempt: TimestampInSeconds,
 }
 
@@ -162,7 +153,7 @@ impl TopicEncryptionKeyState {
             return Ok(RequiredOperation::ShouldRotate);
         }
 
-        if now >= self.last_rekey + self.rekey_period.whole_seconds() as u64 {
+        if now >= self.last_rekey + self.rekey_period.as_secs() {
             return Ok(RequiredOperation::Rekey);
         }
 
@@ -175,8 +166,7 @@ impl TopicEncryptionKeyState {
 
     pub(crate) async fn rekey(
         &mut self,
-        context: &mut Context,
-        secure_channel: &SecureChannels,
+        encryption_at_rest_vault: &Arc<dyn VaultForEncryptionAtRest>,
         now: TimestampInSeconds,
     ) -> ockam_core::Result<()> {
         if self.rekey_counter == u16::MAX {
@@ -187,32 +177,9 @@ impl TopicEncryptionKeyState {
             ));
         }
 
-        let encryptor_address = &self.producer_encryptor_address;
-
-        let secure_channel_entry = secure_channel.secure_channel_registry().get_channel_by_encryptor_address(
-            encryptor_address,
-        ).ok_or_else(|| {
-            Error::new(
-                Origin::Channel,
-                Kind::Unknown,
-                format!("Cannot find secure channel address `{encryptor_address}` in local registry"),
-            )
-        })?;
-
-        let rekey_response: EncryptionResponse = context
-            .send_and_receive(
-                route![secure_channel_entry.encryptor_api_address().clone()],
-                EncryptionRequest::Rekey,
-            )
+        self.secret_key_handle = encryption_at_rest_vault
+            .rekey_and_delete(&self.secret_key_handle)
             .await?;
-
-        match rekey_response {
-            EncryptionResponse::Ok(_) => {}
-            EncryptionResponse::Err(cause) => {
-                error!("Cannot rekey secure channel: {cause}");
-                return Err(cause);
-            }
-        }
 
         self.last_rekey = now;
         self.rekey_counter += 1;
@@ -224,61 +191,55 @@ impl TopicEncryptionKeyState {
 pub(crate) type TopicName = String;
 
 pub struct InnerSecureChannelController {
-    pub(crate) clock: Box<dyn Clock>,
     // we identify the secure channel instance by using the decryptor address of the consumer
     // which is known to both parties
     pub(crate) producer_topic_encryptor_map: HashMap<TopicName, TopicEncryptionKeyState>,
-    pub(crate) node_manager: Weak<NodeManager>,
     // describes how to reach the consumer node
     pub(crate) consumer_resolution: ConsumerResolution,
     // describes if/how to publish the consumer
     pub(crate) consumer_publishing: ConsumerPublishing,
     pub(crate) topic_relay_set: HashSet<String>,
-    pub(crate) secure_channels: Arc<SecureChannels>,
     pub(crate) consumer_policy_access_control: PolicyAccessControl,
-    pub(crate) producer_policy_access_control: PolicyAccessControl,
+    pub(crate) clock: Box<dyn Clock>,
+    pub(crate) node_manager: Weak<NodeManager>,
 }
 
 impl KafkaKeyExchangeControllerImpl {
     pub(crate) fn new(
         node_manager: Arc<NodeManager>,
-        secure_channels: Arc<SecureChannels>,
+        encryption_at_rest: Arc<dyn VaultForEncryptionAtRest>,
         consumer_resolution: ConsumerResolution,
         consumer_publishing: ConsumerPublishing,
         consumer_policy_access_control: PolicyAccessControl,
-        producer_policy_access_control: PolicyAccessControl,
     ) -> KafkaKeyExchangeControllerImpl {
         Self::new_extended(
             ProductionClock,
             node_manager,
-            secure_channels,
+            encryption_at_rest,
             consumer_resolution,
             consumer_publishing,
             consumer_policy_access_control,
-            producer_policy_access_control,
         )
     }
 
     pub(crate) fn new_extended(
         clock: impl Clock,
         node_manager: Arc<NodeManager>,
-        secure_channels: Arc<SecureChannels>,
+        encryption_at_rest: Arc<dyn VaultForEncryptionAtRest>,
         consumer_resolution: ConsumerResolution,
         consumer_publishing: ConsumerPublishing,
         consumer_policy_access_control: PolicyAccessControl,
-        producer_policy_access_control: PolicyAccessControl,
     ) -> KafkaKeyExchangeControllerImpl {
         Self {
+            encryption_at_rest,
             inner: Arc::new(Mutex::new(InnerSecureChannelController {
                 clock: Box::new(clock),
                 producer_topic_encryptor_map: Default::default(),
                 topic_relay_set: Default::default(),
                 node_manager: Arc::downgrade(&node_manager),
-                secure_channels,
                 consumer_resolution,
                 consumer_publishing,
                 consumer_policy_access_control,
-                producer_policy_access_control,
             })),
         }
     }
@@ -287,11 +248,14 @@ impl KafkaKeyExchangeControllerImpl {
 #[cfg(test)]
 mod test {
     use crate::kafka::key_exchange::controller::KafkaKeyExchangeControllerImpl;
+    use crate::kafka::key_exchange::listener::KafkaKeyExchangeListener;
     use crate::kafka::{ConsumerPublishing, ConsumerResolution};
     use crate::test_utils::{AuthorityConfiguration, TestNode};
+    use crate::DefaultAddress;
     use ockam::identity::Identifier;
     use ockam_abac::{Action, Env, Resource, ResourceType};
     use ockam_core::compat::clock::test::TestClock;
+    use ockam_core::AllowAll;
     use ockam_multiaddr::MultiAddr;
     use std::sync::Arc;
     use std::time::Duration;
@@ -327,13 +291,27 @@ mod test {
                 )
                 .await;
 
-                consumer_node
-                    .node_manager
-                    .start_key_exchanger_service(
-                        &consumer_node.context,
-                        crate::DefaultAddress::KEY_EXCHANGER_LISTENER.into(),
-                    )
-                    .await?;
+                let consumer_secure_channel_listener_flow_control_id = consumer_node
+                    .context
+                    .flow_controls()
+                    .get_flow_control_with_spawner(&DefaultAddress::SECURE_CHANNEL_LISTENER.into())
+                    .unwrap();
+
+                KafkaKeyExchangeListener::create(
+                    &consumer_node.context,
+                    consumer_node
+                        .node_manager
+                        .secure_channels
+                        .vault()
+                        .encryption_at_rest_vault,
+                    Duration::from_secs(60),
+                    Duration::from_secs(60),
+                    Duration::from_secs(60),
+                    &consumer_secure_channel_listener_flow_control_id,
+                    AllowAll,
+                    AllowAll,
+                )
+                .await?;
 
                 let test_clock = TestClock::new(0);
 
@@ -377,10 +355,7 @@ mod test {
                     .await?;
 
                 assert_eq!(third_key.rekey_counter, 1);
-                assert_eq!(
-                    first_key.consumer_decryptor_address,
-                    third_key.consumer_decryptor_address
-                );
+                assert_eq!(first_key.secret_key_handle, third_key.secret_key_handle);
 
                 // 04:00 - yet another rekey should happen, but no rotation
                 test_clock.add_seconds(60 * 3);
@@ -390,10 +365,7 @@ mod test {
                     .await?;
 
                 assert_eq!(fourth_key.rekey_counter, 2);
-                assert_eq!(
-                    first_key.consumer_decryptor_address,
-                    fourth_key.consumer_decryptor_address
-                );
+                assert_eq!(first_key.secret_key_handle, fourth_key.secret_key_handle);
 
                 // 05:00 - the default duration of the key is 10 minutes,
                 // but the rotation should happen after 5 minutes
@@ -403,10 +375,7 @@ mod test {
                     .get_or_exchange_key(&mut producer_node.context, "topic_name")
                     .await?;
 
-                assert_ne!(
-                    third_key.consumer_decryptor_address,
-                    fifth_key.consumer_decryptor_address
-                );
+                assert_ne!(third_key.secret_key_handle, fifth_key.secret_key_handle);
                 assert_eq!(fifth_key.rekey_counter, 0);
 
                 // Now let's simulate a failure to rekey by shutting down the consumer
@@ -420,10 +389,7 @@ mod test {
                     .await?;
 
                 assert_eq!(sixth_key.rekey_counter, 1);
-                assert_eq!(
-                    fifth_key.consumer_decryptor_address,
-                    sixth_key.consumer_decryptor_address
-                );
+                assert_eq!(fifth_key.secret_key_handle, sixth_key.secret_key_handle);
 
                 // 10:00 - Rotation fails, but the existing key is still valid
                 // and needs to be rekeyed
@@ -434,10 +400,7 @@ mod test {
                     .await?;
 
                 assert_eq!(seventh_key.rekey_counter, 2);
-                assert_eq!(
-                    fifth_key.consumer_decryptor_address,
-                    seventh_key.consumer_decryptor_address
-                );
+                assert_eq!(fifth_key.secret_key_handle, seventh_key.secret_key_handle);
 
                 // 15:00 - Rotation fails, and the existing key is no longer valid
                 test_clock.add_seconds(60 * 5);
@@ -469,23 +432,17 @@ mod test {
                 Some(authority.clone()),
             );
 
-        let producer_policy_access_control =
-            node.node_manager.policies().make_policy_access_control(
-                node.secure_channels.identities().identities_attributes(),
-                Resource::new("arbitrary-resource-name", ResourceType::KafkaProducer),
-                Action::HandleMessage,
-                Env::new(),
-                Some(authority),
-            );
-
         KafkaKeyExchangeControllerImpl::new_extended(
             test_clock,
             (*node.node_manager).clone(),
-            node.node_manager.secure_channels(),
+            node.node_manager
+                .secure_channels()
+                .vault()
+                .encryption_at_rest_vault
+                .clone(),
             ConsumerResolution::SingleNode(destination),
             ConsumerPublishing::None,
             consumer_policy_access_control,
-            producer_policy_access_control,
         )
     }
 }

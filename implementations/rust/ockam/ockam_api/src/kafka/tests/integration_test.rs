@@ -67,23 +67,12 @@ async fn create_kafka_service(
         )
         .await?;
 
-    let producer_policy_access_control = handle
-        .node_manager
-        .policy_access_control(
-            Some(project_authority.clone()),
-            Resource::new(listener_address.address(), ResourceType::KafkaProducer),
-            Action::HandleMessage,
-            None,
-        )
-        .await?;
-
     let secure_channel_controller = KafkaKeyExchangeControllerImpl::new(
         (*handle.node_manager).clone(),
-        handle.secure_channels.clone(),
+        handle.secure_channels.vault().encryption_at_rest_vault,
         ConsumerResolution::ViaRelay(MultiAddr::try_from("/service/api")?),
         ConsumerPublishing::None,
         consumer_policy_access_control,
-        producer_policy_access_control,
     );
 
     let mut interceptor_multiaddr = MultiAddr::default();

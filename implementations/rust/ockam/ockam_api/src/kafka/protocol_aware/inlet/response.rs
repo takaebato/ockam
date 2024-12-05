@@ -67,7 +67,7 @@ impl KafkaMessageResponseInterceptor for InletInterceptorImpl {
                 ApiKey::FetchKey => {
                     if self.encrypt_content {
                         return self
-                            .handle_fetch_response(context, &mut buffer, &request_info, &header)
+                            .handle_fetch_response(&mut buffer, &request_info, &header)
                             .await;
                     }
                 }
@@ -278,7 +278,6 @@ impl InletInterceptorImpl {
 
     async fn handle_fetch_response(
         &self,
-        context: &mut Context,
         buffer: &mut Bytes,
         request_info: &RequestInfo,
         header: &ResponseHeader,
@@ -301,9 +300,9 @@ impl InletInterceptorImpl {
                     for record in records.iter_mut() {
                         if let Some(record_value) = record.value.take() {
                             let decrypted_content = if self.encrypted_fields.is_empty() {
-                                self.decrypt_whole_record(context, record_value).await?
+                                self.decrypt_whole_record(record_value).await?
                             } else {
-                                self.decrypt_specific_fields(context, record_value).await?
+                                self.decrypt_specific_fields(record_value).await?
                             };
                             record.value = Some(decrypted_content.into());
                         }
@@ -333,28 +332,19 @@ impl InletInterceptorImpl {
         )
     }
 
-    async fn decrypt_whole_record(
-        &self,
-        context: &mut Context,
-        record_value: Bytes,
-    ) -> Result<Vec<u8>, InterceptError> {
-        let message_wrapper: KafkaEncryptedContent =
+    async fn decrypt_whole_record(&self, record_value: Bytes) -> Result<Vec<u8>, InterceptError> {
+        let mut message_wrapper: KafkaEncryptedContent =
             Decoder::new(record_value.as_ref()).decode()?;
 
         self.key_exchange_controller
-            .decrypt_content(
-                context,
-                &message_wrapper.consumer_decryptor_address,
-                message_wrapper.rekey_counter,
-                message_wrapper.content,
-            )
+            .decrypt_content(&mut message_wrapper)
             .await
+            .map(|decrypted_content| decrypted_content.to_vec())
             .map_err(InterceptError::Ockam)
     }
 
     async fn decrypt_specific_fields(
         &self,
-        context: &mut Context,
         record_value: Bytes,
     ) -> Result<Vec<u8>, InterceptError> {
         let mut record_value = serde_json::from_slice::<serde_json::Value>(&record_value)?;
@@ -371,21 +361,16 @@ impl InletInterceptorImpl {
                         return Err("The encrypted field is not a hex-encoded string".into());
                     };
 
-                    let message_wrapper: KafkaEncryptedContent =
+                    let mut message_wrapper: KafkaEncryptedContent =
                         Decoder::new(&encrypted_content).decode()?;
 
                     let decrypted_content = self
                         .key_exchange_controller
-                        .decrypt_content(
-                            context,
-                            &message_wrapper.consumer_decryptor_address,
-                            message_wrapper.rekey_counter,
-                            message_wrapper.content,
-                        )
+                        .decrypt_content(&mut message_wrapper)
                         .await
                         .map_err(InterceptError::Ockam)?;
 
-                    *value = serde_json::from_slice(decrypted_content.as_slice())?;
+                    *value = serde_json::from_slice(decrypted_content)?;
                 }
             }
             serde_json::to_vec(&record_value).map_err(|error| {

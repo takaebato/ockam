@@ -283,6 +283,7 @@ Change history: 81825837830101583285f68200815820f405e06d988fa8039cce1cd0ae607e46
                 Vault::create_secure_channel_vault().await?,
                 Vault::create_credential_vault().await?,
                 Vault::create_verifying_vault(),
+                Vault::create_encryption_at_rest_vault().await?,
             ))
             .build();
 
@@ -302,6 +303,7 @@ Change history: 81825837830101583285f68200815820f405e06d988fa8039cce1cd0ae607e46
                 Vault::create_secure_channel_vault().await?,
                 Vault::create_credential_vault().await?,
                 Vault::create_verifying_vault(),
+                Vault::create_encryption_at_rest_vault().await?,
             ))
             .build();
         let identities02 = Identities::builder()
@@ -311,6 +313,7 @@ Change history: 81825837830101583285f68200815820f405e06d988fa8039cce1cd0ae607e46
                 Vault::create_secure_channel_vault().await?,
                 Vault::create_credential_vault().await?,
                 Vault::create_verifying_vault(),
+                Vault::create_encryption_at_rest_vault().await?,
             ))
             .build();
 

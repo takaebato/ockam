@@ -305,8 +305,10 @@ impl ConnectionBuilder {
                     if changes.flow_control_id.is_some() {
                         self.flow_control_id = changes.flow_control_id;
                     }
+                    start = 0;
+                } else {
+                    start += 1;
                 }
-                start += 1;
             }
         }
 

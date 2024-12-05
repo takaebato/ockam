@@ -55,21 +55,12 @@ mod test {
             Some(handle.node_manager.identifier()),
         );
 
-        let producer_policy_access_control = policies.make_policy_access_control(
-            secure_channels.identities().identities_attributes(),
-            Resource::new("arbitrary-resource-name", ResourceType::KafkaProducer),
-            Action::HandleMessage,
-            Env::new(),
-            Some(handle.node_manager.identifier()),
-        );
-
         let secure_channel_controller = KafkaKeyExchangeControllerImpl::new(
             (*handle.node_manager).clone(),
-            secure_channels,
+            secure_channels.vault().encryption_at_rest_vault,
             ConsumerResolution::None,
             ConsumerPublishing::None,
             consumer_policy_access_control,
-            producer_policy_access_control,
         );
 
         let interceptor = InletInterceptorImpl::new(

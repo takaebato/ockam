@@ -6,6 +6,7 @@ use std::cmp::min;
 use std::str::FromStr;
 
 pub(crate) mod consumer;
+pub(crate) mod custodian;
 pub(crate) mod inlet;
 pub(crate) mod outlet;
 pub(crate) mod producer;
@@ -27,6 +28,10 @@ fn kafka_default_outlet_addr() -> String {
 
 fn kafka_inlet_default_addr() -> String {
     DefaultAddress::KAFKA_INLET.to_string()
+}
+
+fn kafka_custodian_default_addr() -> String {
+    DefaultAddress::KAFKA_CUSTODIAN.to_string()
 }
 
 fn kafka_default_project_route() -> MultiAddr {

@@ -19,6 +19,11 @@ impl AeadSecretKeyHandle {
     pub fn new(handle: HandleToSecret) -> Self {
         Self(AeadSecretKeyHandleType::new(handle))
     }
+
+    /// Convert into an opaque vector
+    pub fn into_vec(self) -> Vec<u8> {
+        self.0 .0.take_value()
+    }
 }
 
 cfg_if! {

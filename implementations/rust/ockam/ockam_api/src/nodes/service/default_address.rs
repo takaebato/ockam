@@ -22,6 +22,7 @@ impl DefaultAddress {
     pub const OKTA_IDENTITY_PROVIDER: &'static str = "okta";
     pub const KAFKA_OUTLET: &'static str = "kafka_outlet";
     pub const KAFKA_INLET: &'static str = "kafka_inlet";
+    pub const KAFKA_CUSTODIAN: &'static str = "kafka_custodian";
     pub const LEASE_MANAGER: &'static str = "lease_manager";
 
     pub fn get_rendezvous_server_address() -> Address {

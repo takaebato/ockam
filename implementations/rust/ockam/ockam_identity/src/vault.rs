@@ -7,8 +7,9 @@ use ockam_vault::storage::SecretsRepository;
 #[cfg(feature = "storage")]
 use ockam_vault::storage::SecretsSqlxDatabase;
 use ockam_vault::{
-    SoftwareVaultForSecureChannels, SoftwareVaultForSigning, SoftwareVaultForVerifyingSignatures,
-    VaultForSecureChannels, VaultForSigning, VaultForVerifyingSignatures,
+    SoftwareVaultForAtRestEncryption, SoftwareVaultForSecureChannels, SoftwareVaultForSigning,
+    SoftwareVaultForVerifyingSignatures, VaultForEncryptionAtRest, VaultForSecureChannels,
+    VaultForSigning, VaultForVerifyingSignatures,
 };
 
 /// Vault
@@ -22,6 +23,8 @@ pub struct Vault {
     pub credential_vault: Arc<dyn VaultForSigning>,
     /// Vault used for verifying signature and sha256
     pub verifying_vault: Arc<dyn VaultForVerifyingSignatures>,
+    /// Vault used for encrypting data at rest
+    pub encryption_at_rest_vault: Arc<dyn VaultForEncryptionAtRest>,
 }
 
 impl Vault {
@@ -31,12 +34,14 @@ impl Vault {
         secure_channel_vault: Arc<dyn VaultForSecureChannels>,
         credential_vault: Arc<dyn VaultForSigning>,
         verifying_vault: Arc<dyn VaultForVerifyingSignatures>,
+        encryption_at_rest_vault: Arc<dyn VaultForEncryptionAtRest>,
     ) -> Self {
         Self {
             identity_vault,
             secure_channel_vault,
             credential_vault,
             verifying_vault,
+            encryption_at_rest_vault,
         }
     }
 
@@ -48,6 +53,7 @@ impl Vault {
             Self::create_secure_channel_vault().await?,
             Self::create_credential_vault().await?,
             Self::create_verifying_vault(),
+            Self::create_encryption_at_rest_vault().await?,
         ))
     }
 
@@ -79,6 +85,13 @@ impl Vault {
     pub fn create_verifying_vault() -> Arc<dyn VaultForVerifyingSignatures> {
         Arc::new(SoftwareVaultForVerifyingSignatures {})
     }
+
+    /// Create [`SoftwareVaultForAtRestEncryption`] with an in-memory storage
+    pub async fn create_encryption_at_rest_vault() -> Result<Arc<dyn VaultForEncryptionAtRest>> {
+        Ok(Arc::new(SoftwareVaultForAtRestEncryption::new(Arc::new(
+            SecretsSqlxDatabase::create().await?,
+        ))))
+    }
 }
 
 impl Vault {
@@ -95,6 +108,7 @@ impl Vault {
             Arc::new(SoftwareVaultForSecureChannels::new(repository.clone())),
             Arc::new(SoftwareVaultForSigning::new(repository.clone())),
             Arc::new(SoftwareVaultForVerifyingSignatures {}),
+            Arc::new(SoftwareVaultForAtRestEncryption::new(repository)),
         )
     }
 }

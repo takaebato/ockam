@@ -122,6 +122,11 @@ pub struct CreateCommand {
     /// You can check the fallback policy with `ockam policy show --resource-type kafka-producer`.
     #[arg(hide = true, long = "allow-producer", id = "PRODUCER-EXPRESSION")]
     pub producer_policy_expression: Option<PolicyExpression>,
+
+    /// The name of the Vault used to decrypt the encrypted data.
+    /// When not provided, the default Vault will be used.
+    #[arg(long, value_name = "VAULT_NAME")]
+    pub vault: Option<String>,
 }
 
 #[async_trait]
@@ -192,6 +197,7 @@ impl Command for CreateCommand {
                 self.inlet_policy_expression,
                 self.consumer_policy_expression,
                 self.producer_policy_expression,
+                self.vault,
             );
             let payload = StartServiceRequest::new(payload, &addr);
             let req = Request::post("/node/services/kafka_inlet").body(payload);

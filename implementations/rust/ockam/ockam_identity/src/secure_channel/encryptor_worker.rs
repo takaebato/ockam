@@ -173,6 +173,9 @@ impl EncryptorWorker {
                     EncryptionResponse::Err(err)
                 }
             },
+            EncryptionRequest::DeriveNewKey => {
+                todo!()
+            }
         };
 
         // Send the reply to the caller
