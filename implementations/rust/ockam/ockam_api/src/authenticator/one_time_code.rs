@@ -13,7 +13,7 @@ use std::fmt::{Debug, Formatter};
 /// A one-time code can be used to enroll
 /// a node with some authenticated attributes
 /// It can be retrieved with a command like `ockam project ticket --attribute component=control`
-#[derive(Clone, Encode, Decode, CborLen, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, CborLen, PartialEq, Eq, Copy)]
 #[rustfmt::skip]
 #[cbor(map)]
 pub struct OneTimeCode {

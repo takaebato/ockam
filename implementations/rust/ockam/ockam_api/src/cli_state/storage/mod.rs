@@ -18,7 +18,7 @@ pub use users_repository_sql::*;
 pub use vaults_repository::*;
 pub use vaults_repository_sql::*;
 
-mod auto_retry;
+pub mod auto_retry;
 mod enrollments_repository;
 mod enrollments_repository_sql;
 mod identities_repository;

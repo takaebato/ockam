@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use ockam::identity::{Identities, SecureChannelSqlxDatabase, SecureChannels};
 
-use crate::cli_state::CliState;
 use crate::cli_state::Result;
+use crate::cli_state::{AutoRetry, CliState};
 
 impl CliState {
     pub async fn secure_channels(&self, node_name: &str) -> Result<Arc<SecureChannels>> {
@@ -15,7 +15,9 @@ impl CliState {
             .build();
         Ok(SecureChannels::from_identities(
             identities,
-            Arc::new(SecureChannelSqlxDatabase::new(self.database())),
+            Arc::new(AutoRetry::new(SecureChannelSqlxDatabase::new(
+                self.database(),
+            ))),
         ))
     }
 }

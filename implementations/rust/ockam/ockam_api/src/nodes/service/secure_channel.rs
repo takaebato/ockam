@@ -1,5 +1,19 @@
 use std::time::Duration;
 
+use crate::cli_state::AutoRetry;
+use crate::nodes::models::secure_channel::CreateSecureChannelListenerRequest;
+use crate::nodes::models::secure_channel::CreateSecureChannelRequest;
+use crate::nodes::models::secure_channel::DeleteSecureChannelListenerRequest;
+use crate::nodes::models::secure_channel::DeleteSecureChannelRequest;
+use crate::nodes::models::secure_channel::ShowSecureChannelListenerRequest;
+use crate::nodes::models::secure_channel::ShowSecureChannelRequest;
+use crate::nodes::models::secure_channel::{
+    CreateSecureChannelResponse, DeleteSecureChannelListenerResponse, DeleteSecureChannelResponse,
+    ShowSecureChannelResponse,
+};
+use crate::nodes::registry::SecureChannelInfo;
+use crate::nodes::service::default_address::DefaultAddress;
+use crate::nodes::{NodeManager, NodeManagerWorker};
 use ockam::identity::models::CredentialAndPurposeKey;
 use ockam::identity::Vault;
 use ockam::identity::{
@@ -14,20 +28,6 @@ use ockam_core::compat::sync::Arc;
 use ockam_core::errcode::{Kind, Origin};
 use ockam_multiaddr::MultiAddr;
 use ockam_node::Context;
-
-use crate::nodes::models::secure_channel::CreateSecureChannelListenerRequest;
-use crate::nodes::models::secure_channel::CreateSecureChannelRequest;
-use crate::nodes::models::secure_channel::DeleteSecureChannelListenerRequest;
-use crate::nodes::models::secure_channel::DeleteSecureChannelRequest;
-use crate::nodes::models::secure_channel::ShowSecureChannelListenerRequest;
-use crate::nodes::models::secure_channel::ShowSecureChannelRequest;
-use crate::nodes::models::secure_channel::{
-    CreateSecureChannelResponse, DeleteSecureChannelListenerResponse, DeleteSecureChannelResponse,
-    ShowSecureChannelResponse,
-};
-use crate::nodes::registry::SecureChannelInfo;
-use crate::nodes::service::default_address::DefaultAddress;
-use crate::nodes::{NodeManager, NodeManagerWorker};
 
 #[derive(PartialOrd, PartialEq, Debug)]
 pub enum SecureChannelType {
@@ -471,7 +471,9 @@ impl NodeManager {
         Ok(Arc::new(SecureChannels::new(
             identities,
             self.secure_channels.secure_channel_registry(),
-            Arc::new(SecureChannelSqlxDatabase::new(self.cli_state.database())),
+            Arc::new(AutoRetry::new(SecureChannelSqlxDatabase::new(
+                self.cli_state.database(),
+            ))),
         )))
     }
 }

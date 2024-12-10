@@ -1,3 +1,4 @@
+use crate::cli_state::AutoRetry;
 use crate::CliState;
 use ockam::identity::{
     IdentitiesAttributes, IdentityAttributesRepository, IdentityAttributesSqlxDatabase,
@@ -18,9 +19,9 @@ impl CliState {
         &self,
         node_name: &str,
     ) -> Arc<dyn IdentityAttributesRepository> {
-        Arc::new(IdentityAttributesSqlxDatabase::new(
+        Arc::new(AutoRetry::new(IdentityAttributesSqlxDatabase::new(
             self.database(),
             node_name,
-        ))
+        )))
     }
 }

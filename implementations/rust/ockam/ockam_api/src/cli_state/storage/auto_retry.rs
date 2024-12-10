@@ -1,3 +1,8 @@
+use crate::authenticator::one_time_code::OneTimeCode;
+use crate::authenticator::{
+    AuthorityEnrollmentTokenRepository, AuthorityMember, AuthorityMembersRepository,
+    EnrollmentToken, PreTrustedIdentities,
+};
 use crate::cli_state::journeys::{Journey, ProjectJourney};
 use crate::cli_state::{
     EnrollmentsRepository, IdentitiesRepository, IdentityEnrollment, JourneysRepository,
@@ -14,8 +19,13 @@ use chrono::{DateTime, Utc};
 use ockam::identity::models::{ChangeHistory, CredentialAndPurposeKey, PurposeKeyAttestation};
 use ockam::identity::storage::PurposeKeysRepository;
 use ockam::identity::{
-    ChangeHistoryRepository, CredentialRepository, Identifier, Identity, Purpose,
+    AttributesEntry, ChangeHistoryRepository, CredentialRepository, Identifier, Identity,
+    IdentityAttributesRepository, PersistedSecureChannel, Purpose, SecureChannelRepository,
     TimestampInSeconds,
+};
+use ockam_abac::{
+    Action, Expr, Resource, ResourceName, ResourcePoliciesRepository, ResourcePolicy, ResourceType,
+    ResourceTypePoliciesRepository, ResourceTypePolicy, ResourcesRepository,
 };
 use ockam_core::{async_trait, Address};
 use ockam_vault::storage::SecretsRepository;
@@ -44,7 +54,7 @@ macro_rules! retry {
 }
 
 #[derive(Clone)]
-pub(crate) struct AutoRetry<T: Sized + Send + Sync + 'static> {
+pub struct AutoRetry<T: Sized + Send + Sync + 'static> {
     wrapped: T,
 }
 
@@ -80,6 +90,21 @@ impl<T: EnrollmentsRepository> EnrollmentsRepository for AutoRetry<T> {
 
     async fn is_identity_enrolled(&self, name: &str) -> ockam_core::Result<bool> {
         retry!(self.wrapped.is_identity_enrolled(name))
+    }
+}
+
+#[async_trait]
+impl<T: AuthorityEnrollmentTokenRepository> AuthorityEnrollmentTokenRepository for AutoRetry<T> {
+    async fn use_token(
+        &self,
+        one_time_code: OneTimeCode,
+        now: TimestampInSeconds,
+    ) -> ockam_core::Result<Option<EnrollmentToken>> {
+        retry!(self.wrapped.use_token(one_time_code, now))
+    }
+
+    async fn store_new_token(&self, token: EnrollmentToken) -> ockam_core::Result<()> {
+        retry!(self.wrapped.store_new_token(token.clone()))
     }
 }
 
@@ -624,5 +649,173 @@ impl<T: SecretsRepository> SecretsRepository for AutoRetry<T> {
 
     async fn delete_all(&self) -> ockam_core::Result<()> {
         retry!(self.wrapped.delete_all())
+    }
+}
+
+#[async_trait]
+impl<T: ResourcesRepository> ResourcesRepository for AutoRetry<T> {
+    async fn store_resource(&self, resource: &Resource) -> ockam_core::Result<()> {
+        retry!(self.wrapped.store_resource(resource))
+    }
+
+    async fn get_resource(
+        &self,
+        resource_name: &ResourceName,
+    ) -> ockam_core::Result<Option<Resource>> {
+        retry!(self.wrapped.get_resource(resource_name))
+    }
+
+    async fn delete_resource(&self, resource_name: &ResourceName) -> ockam_core::Result<()> {
+        retry!(self.wrapped.delete_resource(resource_name))
+    }
+}
+
+#[async_trait]
+impl<T: ResourcePoliciesRepository> ResourcePoliciesRepository for AutoRetry<T> {
+    async fn store_policy(
+        &self,
+        resource_name: &ResourceName,
+        action: &Action,
+        expression: &Expr,
+    ) -> ockam_core::Result<()> {
+        retry!(self.wrapped.store_policy(resource_name, action, expression))
+    }
+
+    async fn get_policy(
+        &self,
+        resource_name: &ResourceName,
+        action: &Action,
+    ) -> ockam_core::Result<Option<ResourcePolicy>> {
+        retry!(self.wrapped.get_policy(resource_name, action))
+    }
+
+    async fn get_policies(&self) -> ockam_core::Result<Vec<ResourcePolicy>> {
+        retry!(self.wrapped.get_policies())
+    }
+
+    async fn get_policies_by_resource_name(
+        &self,
+        resource_name: &ResourceName,
+    ) -> ockam_core::Result<Vec<ResourcePolicy>> {
+        retry!(self.wrapped.get_policies_by_resource_name(resource_name))
+    }
+
+    async fn delete_policy(
+        &self,
+        resource_name: &ResourceName,
+        action: &Action,
+    ) -> ockam_core::Result<()> {
+        retry!(self.wrapped.delete_policy(resource_name, action))
+    }
+}
+
+#[async_trait]
+impl<T: ResourceTypePoliciesRepository> ResourceTypePoliciesRepository for AutoRetry<T> {
+    async fn store_policy(
+        &self,
+        resource_type: &ResourceType,
+        action: &Action,
+        expression: &Expr,
+    ) -> ockam_core::Result<()> {
+        retry!(self.wrapped.store_policy(resource_type, action, expression))
+    }
+
+    async fn get_policy(
+        &self,
+        resource_type: &ResourceType,
+        action: &Action,
+    ) -> ockam_core::Result<Option<ResourceTypePolicy>> {
+        retry!(self.wrapped.get_policy(resource_type, action))
+    }
+
+    async fn get_policies(&self) -> ockam_core::Result<Vec<ResourceTypePolicy>> {
+        retry!(self.wrapped.get_policies())
+    }
+
+    async fn get_policies_by_resource_type(
+        &self,
+        resource_type: &ResourceType,
+    ) -> ockam_core::Result<Vec<ResourceTypePolicy>> {
+        retry!(self.wrapped.get_policies_by_resource_type(resource_type))
+    }
+
+    async fn delete_policy(
+        &self,
+        resource_type: &ResourceType,
+        action: &Action,
+    ) -> ockam_core::Result<()> {
+        retry!(self.wrapped.delete_policy(resource_type, action))
+    }
+}
+
+#[async_trait]
+impl<T: AuthorityMembersRepository> AuthorityMembersRepository for AutoRetry<T> {
+    async fn get_member(
+        &self,
+        identifier: &Identifier,
+    ) -> ockam_core::Result<Option<AuthorityMember>> {
+        retry!(self.wrapped.get_member(identifier))
+    }
+
+    async fn get_members(&self) -> ockam_core::Result<Vec<AuthorityMember>> {
+        retry!(self.wrapped.get_members())
+    }
+
+    async fn delete_member(&self, identifier: &Identifier) -> ockam_core::Result<()> {
+        retry!(self.wrapped.delete_member(identifier))
+    }
+
+    async fn add_member(&self, member: AuthorityMember) -> ockam_core::Result<()> {
+        retry!(self.wrapped.add_member(member.clone()))
+    }
+
+    async fn bootstrap_pre_trusted_members(
+        &self,
+        pre_trusted_identities: &PreTrustedIdentities,
+    ) -> ockam_core::Result<()> {
+        retry!(self
+            .wrapped
+            .bootstrap_pre_trusted_members(pre_trusted_identities))
+    }
+}
+
+#[async_trait]
+impl<T: IdentityAttributesRepository> IdentityAttributesRepository for AutoRetry<T> {
+    async fn get_attributes(
+        &self,
+        subject: &Identifier,
+        attested_by: &Identifier,
+    ) -> ockam_core::Result<Option<AttributesEntry>> {
+        retry!(self.wrapped.get_attributes(subject, attested_by))
+    }
+
+    async fn put_attributes(
+        &self,
+        subject: &Identifier,
+        entry: AttributesEntry,
+    ) -> ockam_core::Result<()> {
+        retry!(self.wrapped.put_attributes(subject, entry.clone()))
+    }
+
+    async fn delete_expired_attributes(&self, now: TimestampInSeconds) -> ockam_core::Result<()> {
+        retry!(self.wrapped.delete_expired_attributes(now))
+    }
+}
+
+#[async_trait]
+impl<T: SecureChannelRepository> SecureChannelRepository for AutoRetry<T> {
+    async fn get(
+        &self,
+        decryptor_remote_address: &Address,
+    ) -> ockam_core::Result<Option<PersistedSecureChannel>> {
+        retry!(self.wrapped.get(decryptor_remote_address))
+    }
+
+    async fn put(&self, secure_channel: PersistedSecureChannel) -> ockam_core::Result<()> {
+        retry!(self.wrapped.put(secure_channel.clone()))
+    }
+
+    async fn delete(&self, decryptor_remote_address: &Address) -> ockam_core::Result<()> {
+        retry!(self.wrapped.delete(decryptor_remote_address))
     }
 }

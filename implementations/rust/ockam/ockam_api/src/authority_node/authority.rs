@@ -24,6 +24,7 @@ use ockam_node::database::SqlxDatabase;
 use ockam_node::Context;
 
 use crate::authority_node::Configuration;
+use crate::cli_state::AutoRetry;
 use crate::echoer::Echoer;
 use crate::nodes::service::default_address::DefaultAddress;
 
@@ -73,9 +74,15 @@ impl Authority {
             SqlxDatabase::create(&configuration.database_configuration).await?
         };
 
-        let members = Arc::new(AuthorityMembersSqlxDatabase::new(database.clone()));
-        let tokens = Arc::new(AuthorityEnrollmentTokenSqlxDatabase::new(database.clone()));
-        let secure_channel_repository = Arc::new(SecureChannelSqlxDatabase::new(database.clone()));
+        let members = Arc::new(AutoRetry::new(AuthorityMembersSqlxDatabase::new(
+            database.clone(),
+        )));
+        let tokens = Arc::new(AutoRetry::new(AuthorityEnrollmentTokenSqlxDatabase::new(
+            database.clone(),
+        )));
+        let secure_channel_repository = Arc::new(AutoRetry::new(SecureChannelSqlxDatabase::new(
+            database.clone(),
+        )));
 
         Self::bootstrap_repository(members.clone(), configuration).await?;
 
