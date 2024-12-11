@@ -1,0 +1,11 @@
+[package]
+name = "tcp-test"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+clap = { version = "4", features = ["derive", "cargo"] }
+tokio = { version = "1", features = ["full"] }
+tokio-rustls = {  version = "0.26", features = ["aws-lc-rs"] }
+rcgen = { version = "0.13", features = ["pem", "aws_lc_rs"], default-features = false }
+rustls = { version = "0.23" }
