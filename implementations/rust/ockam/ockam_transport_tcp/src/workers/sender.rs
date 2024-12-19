@@ -9,12 +9,13 @@ use ockam_core::{
 use ockam_core::{Any, Decodable, Mailbox, Mailboxes, Message, Result, Routed, Worker};
 use ockam_node::{Context, WorkerBuilder};
 
+use crate::transport::ConnectionCollector;
 use crate::transport_message::TcpTransportMessage;
 use ockam_transport_core::TransportError;
 use serde::{Deserialize, Serialize};
 use tokio::io::AsyncWriteExt;
 use tokio::net::tcp::OwnedWriteHalf;
-use tracing::{info, instrument, trace, warn};
+use tracing::{debug, info, instrument, trace, warn};
 
 #[derive(Serialize, Deserialize, Message, Clone)]
 pub(crate) enum TcpSendWorkerMsg {
@@ -32,33 +33,40 @@ pub(crate) enum TcpSendWorkerMsg {
 pub(crate) struct TcpSendWorker {
     buffer: Vec<u8>,
     registry: TcpRegistry,
-    write_half: OwnedWriteHalf,
+    write_half: Option<OwnedWriteHalf>,
     socket_address: SocketAddr,
     addresses: Addresses,
     mode: TcpConnectionMode,
     receiver_flow_control_id: FlowControlId,
     rx_should_be_stopped: bool,
+    connection_collector: Option<Arc<ConnectionCollector>>,
+    initialized: bool,
 }
 
 impl TcpSendWorker {
     /// Create a new `TcpSendWorker`
+    #[allow(clippy::too_many_arguments)]
     fn new(
         registry: TcpRegistry,
         write_half: OwnedWriteHalf,
+        initialized: bool,
         socket_address: SocketAddr,
         addresses: Addresses,
         mode: TcpConnectionMode,
         receiver_flow_control_id: FlowControlId,
+        connection_collector: Option<Arc<ConnectionCollector>>,
     ) -> Self {
         Self {
             buffer: vec![],
             registry,
-            write_half,
+            write_half: Some(write_half),
             socket_address,
             addresses,
             receiver_flow_control_id,
             mode,
+            connection_collector,
             rx_should_be_stopped: true,
+            initialized,
         }
     }
 }
@@ -72,19 +80,23 @@ impl TcpSendWorker {
         ctx: &Context,
         registry: TcpRegistry,
         write_half: OwnedWriteHalf,
+        skip_initialization: bool,
         addresses: &Addresses,
         socket_address: SocketAddr,
         mode: TcpConnectionMode,
         receiver_flow_control_id: &FlowControlId,
+        connection_collector: Option<Arc<ConnectionCollector>>,
     ) -> Result<()> {
         trace!("Creating new TCP worker pair");
         let sender_worker = Self::new(
             registry,
             write_half,
+            skip_initialization,
             socket_address,
             addresses.clone(),
             mode,
             receiver_flow_control_id.clone(),
+            connection_collector,
         );
 
         let main_mailbox = Mailbox::new(
@@ -154,6 +166,7 @@ impl TcpSendWorker {
 
         // Replace zeros with actual length
         self.buffer[..LENGTH_VALUE_SIZE].copy_from_slice(&payload_len_u32.to_be_bytes());
+        trace!("Sending {payload_len_u32} bytes");
 
         Ok(())
     }
@@ -176,27 +189,48 @@ impl Worker for TcpSendWorker {
             self.receiver_flow_control_id.clone(),
         ));
 
-        // First thing send our protocol version
-        if self
-            .write_half
-            .write_u8(TcpProtocolVersion::V1.into())
-            .await
-            .is_err()
-        {
-            warn!(
-                "Failed to send protocol version to peer {}",
-                self.socket_address
-            );
-            self.stop(ctx).await?;
-
+        // First thing sends our protocol version
+        if self.initialized {
             return Ok(());
         }
+
+        if let Some(write_half) = self.write_half.as_mut() {
+            if write_half
+                .write_u8(TcpProtocolVersion::V1.into())
+                .await
+                .is_err()
+            {
+                warn!(
+                    "Failed to send protocol version to peer {}",
+                    self.socket_address
+                );
+                self.write_half.take();
+                self.stop(ctx).await?;
+
+                return Ok(());
+            }
+        } else {
+            self.stop(ctx).await?;
+            return Err(TransportError::ConnectionDrop)?;
+        }
+
+        self.initialized = true;
 
         Ok(())
     }
 
     #[instrument(skip_all, name = "TcpSendWorker::shutdown")]
     async fn shutdown(&mut self, ctx: &mut Self::Context) -> Result<()> {
+        if self.initialized {
+            if let Some(connection_collector) = self.connection_collector.as_ref() {
+                if let Some(write_half) = self.write_half.take() {
+                    connection_collector.collect_write_half(write_half);
+                } else {
+                    debug!("Connection closed, no read write to collect");
+                }
+            }
+        }
+
         self.registry
             .remove_sender_worker(self.addresses.sender_address());
 
@@ -230,6 +264,7 @@ impl Worker for TcpSendWorker {
                     // No need to stop Receiver as it notified us about connection drop and will
                     // stop itself
                     self.rx_should_be_stopped = false;
+                    self.write_half.take();
                     self.stop(ctx).await?;
 
                     return Ok(());
@@ -243,16 +278,23 @@ impl Worker for TcpSendWorker {
 
             if let Err(err) = self.serialize_message(local_message) {
                 // Close the stream
+                self.write_half.take();
                 self.stop(ctx).await?;
 
                 return Err(err);
             };
 
-            if self.write_half.write_all(&self.buffer).await.is_err() {
-                warn!("Failed to send message to peer {}", self.socket_address);
-                self.stop(ctx).await?;
+            if let Some(write_half) = self.write_half.as_mut() {
+                if write_half.write_all(&self.buffer).await.is_err() {
+                    warn!("Failed to send message to peer {}", self.socket_address);
+                    self.write_half.take();
+                    self.stop(ctx).await?;
 
-                return Ok(());
+                    return Ok(());
+                }
+            } else {
+                self.stop(ctx).await?;
+                return Err(TransportError::ConnectionDrop)?;
             }
         }
 

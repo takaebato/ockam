@@ -5,6 +5,7 @@ use ockam_core::{Address, Processor, Result};
 use ockam_node::Context;
 use ockam_transport_core::TransportError;
 use tokio::net::TcpListener;
+use tokio::time::Instant;
 use tracing::{debug, instrument};
 
 /// A TCP Listen processor
@@ -102,10 +103,12 @@ impl Processor for TcpListenProcessor {
             ctx,
             self.registry.clone(),
             write_half,
+            false,
             &addresses,
             peer,
             mode,
             &receiver_flow_control_id,
+            None,
         )
         .await?;
 
@@ -114,11 +117,14 @@ impl Processor for TcpListenProcessor {
             ctx,
             self.registry.clone(),
             read_half,
+            false,
+            Instant::now(),
             &addresses,
             peer,
             mode,
             &receiver_flow_control_id,
             receiver_outgoing_access_control,
+            None,
         )
         .await?;
 

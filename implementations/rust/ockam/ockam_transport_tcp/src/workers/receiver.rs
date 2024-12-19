@@ -1,3 +1,4 @@
+use crate::transport::ConnectionCollector;
 use crate::transport_message::TcpTransportMessage;
 use crate::workers::Addresses;
 use crate::{
@@ -15,8 +16,9 @@ use ockam_core::{
 use ockam_core::{Processor, Result};
 use ockam_node::{Context, ProcessorBuilder};
 use ockam_transport_core::TransportError;
+use tokio::time::Instant;
 use tokio::{io::AsyncReadExt, net::tcp::OwnedReadHalf};
-use tracing::{info, instrument, trace};
+use tracing::{debug, info, instrument, trace};
 
 /// A TCP receiving message processor
 ///
@@ -29,31 +31,41 @@ use tracing::{info, instrument, trace};
 pub(crate) struct TcpRecvProcessor {
     registry: TcpRegistry,
     incoming_buffer: Vec<u8>,
-    read_half: OwnedReadHalf,
+    read_half: Option<OwnedReadHalf>,
     socket_address: SocketAddr,
     addresses: Addresses,
     mode: TcpConnectionMode,
     flow_control_id: FlowControlId,
+    connection_collector: Option<Arc<ConnectionCollector>>,
+    last_known_reply: Instant,
+    initialized: bool,
 }
 
 impl TcpRecvProcessor {
     /// Create a new `TcpRecvProcessor`
+    #[allow(clippy::too_many_arguments)]
     fn new(
         registry: TcpRegistry,
         read_half: OwnedReadHalf,
+        last_known_reply: Instant,
         socket_address: SocketAddr,
         addresses: Addresses,
         mode: TcpConnectionMode,
         flow_control_id: FlowControlId,
+        connection_collector: Option<Arc<ConnectionCollector>>,
+        initialized: bool,
     ) -> Self {
         Self {
             registry,
             incoming_buffer: Vec::new(),
-            read_half,
+            read_half: Some(read_half),
             socket_address,
             addresses,
             mode,
             flow_control_id,
+            connection_collector,
+            last_known_reply,
+            initialized,
         }
     }
 
@@ -63,19 +75,25 @@ impl TcpRecvProcessor {
         ctx: &Context,
         registry: TcpRegistry,
         read_half: OwnedReadHalf,
+        skip_initialization: bool,
+        last_known_reply: Instant,
         addresses: &Addresses,
         socket_address: SocketAddr,
         mode: TcpConnectionMode,
         flow_control_id: &FlowControlId,
         receiver_outgoing_access_control: Arc<dyn OutgoingAccessControl>,
+        connection_collector: Option<Arc<ConnectionCollector>>,
     ) -> Result<()> {
         let receiver = TcpRecvProcessor::new(
             registry,
             read_half,
+            last_known_reply,
             socket_address,
             addresses.clone(),
             mode,
             flow_control_id.clone(),
+            connection_collector,
+            skip_initialization,
         );
 
         let mailbox = Mailbox::new(
@@ -98,7 +116,12 @@ impl TcpRecvProcessor {
         Ok(())
     }
 
-    async fn notify_sender_stream_dropped(&self, ctx: &Context, msg: impl Display) -> Result<()> {
+    async fn notify_sender_stream_dropped(
+        &mut self,
+        ctx: &Context,
+        msg: impl Display,
+    ) -> Result<()> {
+        self.read_half.take();
         info!(
             "Connection to peer '{}' was closed; dropping stream. {}",
             self.socket_address, msg
@@ -129,12 +152,23 @@ impl Processor for TcpRecvProcessor {
             self.flow_control_id.clone(),
         ));
 
-        let protocol_version = match self.read_half.read_u8().await {
-            Ok(p) => p,
-            Err(e) => {
-                self.notify_sender_stream_dropped(ctx, e).await?;
-                return Err(TransportError::GenericIo)?;
+        if self.initialized {
+            return Ok(());
+        }
+
+        let protocol_version = if let Some(read_half) = self.read_half.as_mut() {
+            match read_half.read_u8().await {
+                Ok(p) => {
+                    self.last_known_reply = Instant::now();
+                    p
+                }
+                Err(e) => {
+                    self.notify_sender_stream_dropped(ctx, e).await?;
+                    return Err(TransportError::GenericIo)?;
+                }
             }
+        } else {
+            return Err(TransportError::ConnectionDrop)?;
         };
 
         let _protocol_version = match TcpProtocolVersion::try_from(protocol_version) {
@@ -153,13 +187,25 @@ impl Processor for TcpRecvProcessor {
             }
         };
 
+        self.last_known_reply = Instant::now();
+        self.initialized = true;
+
         Ok(())
     }
 
     #[instrument(skip_all, name = "TcpRecvProcessor::shutdown")]
     async fn shutdown(&mut self, ctx: &mut Self::Context) -> Result<()> {
-        self.registry.remove_receiver_processor(&ctx.address());
+        if self.initialized {
+            if let Some(connection_collector) = self.connection_collector.as_ref() {
+                if let Some(read_half) = self.read_half.take() {
+                    connection_collector.collect_read_half(self.last_known_reply, read_half);
+                } else {
+                    debug!("Connection closed, no read half to collect");
+                }
+            }
+        }
 
+        self.registry.remove_receiver_processor(&ctx.address());
         Ok(())
     }
 
@@ -177,7 +223,13 @@ impl Processor for TcpRecvProcessor {
     #[instrument(skip_all, name = "TcpRecvProcessor::process", fields(worker = %ctx.address()))]
     async fn process(&mut self, ctx: &mut Context) -> Result<bool> {
         // Read the message length
-        let len = match self.read_half.read_u32().await {
+        let read_half = if let Some(read_half) = self.read_half.as_mut() {
+            read_half
+        } else {
+            return Ok(false);
+        };
+
+        let len = match read_half.read_u32().await {
             Ok(l) => l,
             Err(e) => {
                 self.notify_sender_stream_dropped(ctx, e).await?;
@@ -217,7 +269,7 @@ impl Processor for TcpRecvProcessor {
         self.incoming_buffer.resize(len_usize, 0);
 
         // Then read into the buffer
-        match self.read_half.read_exact(&mut self.incoming_buffer).await {
+        match read_half.read_exact(&mut self.incoming_buffer).await {
             Ok(_) => {}
             Err(e) => {
                 self.notify_sender_stream_dropped(ctx, e).await?;

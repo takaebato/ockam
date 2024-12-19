@@ -1,4 +1,4 @@
-use crate::transport::connect;
+use crate::transport::{connect, CachedConnectionsQueue};
 use crate::workers::{Addresses, TcpRecvProcessor, TcpSendWorker};
 use crate::{TcpConnectionMode, TcpConnectionOptions, TcpTransport};
 use core::fmt;
@@ -10,6 +10,9 @@ use ockam_core::{Address, Result};
 use ockam_node::Context;
 use ockam_transport_core::HostnamePort;
 use std::net::SocketAddr;
+use std::sync::{Arc, Mutex as SyncMutex, Weak};
+use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
+use tokio::time::Instant;
 use tracing::debug;
 
 /// Result of [`TcpTransport::connect`] call.
@@ -84,6 +87,55 @@ impl TcpConnection {
     }
 }
 
+pub(crate) struct ConnectionCollector {
+    hostname_port: HostnamePort,
+    connections_queue: Weak<CachedConnectionsQueue>,
+    read_half: SyncMutex<Option<(Instant, OwnedReadHalf)>>,
+    write_half: SyncMutex<Option<OwnedWriteHalf>>,
+}
+
+impl ConnectionCollector {
+    fn new(hostname_port: HostnamePort, connections_queue: &Arc<CachedConnectionsQueue>) -> Self {
+        Self {
+            hostname_port,
+            connections_queue: Arc::downgrade(connections_queue),
+            read_half: SyncMutex::new(None),
+            write_half: SyncMutex::new(None),
+        }
+    }
+
+    pub(crate) fn collect_read_half(&self, last_known_reply: Instant, read_half: OwnedReadHalf) {
+        debug!("Collecting read half for {}", self.hostname_port);
+        self.read_half
+            .lock()
+            .unwrap()
+            .replace((last_known_reply, read_half));
+        self.check_and_push_connection();
+    }
+
+    pub(crate) fn collect_write_half(&self, write_half: OwnedWriteHalf) {
+        debug!("Collecting write half for {}", self.hostname_port);
+        self.write_half.lock().unwrap().replace(write_half);
+        self.check_and_push_connection();
+    }
+
+    fn check_and_push_connection(&self) {
+        let mut read_half = self.read_half.lock().unwrap();
+        let mut write_half = self.write_half.lock().unwrap();
+
+        if read_half.is_some() && write_half.is_some() {
+            if let Some(connections_queue) = self.connections_queue.upgrade() {
+                let (last_known_reply, read_half) = read_half.take().unwrap();
+                let write_half = write_half.take().unwrap();
+
+                let mut guard = connections_queue.lock().unwrap();
+                let connections = guard.entry(self.hostname_port.clone()).or_default();
+                connections.push_back((last_known_reply, read_half, write_half));
+            }
+        }
+    }
+}
+
 impl TcpTransport {
     /// Establish an outgoing TCP connection.
     ///
@@ -103,9 +155,41 @@ impl TcpTransport {
         options: TcpConnectionOptions,
     ) -> Result<TcpConnection> {
         let peer = HostnamePort::from_str(&peer.into())?;
-        debug!("Connecting to {}", peer.clone());
 
-        let (read_half, write_half) = connect(&peer).await?;
+        let (last_known_reply, skip_initialization, read_half, write_half) = {
+            let connection = {
+                let mut guard = self.connections.lock().unwrap();
+                if let Some(connections) = guard.get_mut(&peer) {
+                    loop {
+                        if let Some((last_known_reply, read_half, write_half)) =
+                            connections.pop_front()
+                        {
+                            let elapsed = last_known_reply.elapsed();
+                            if elapsed.as_secs() < 2 {
+                                debug!(
+                                    "Reusing existing connection to {}, {}ms old",
+                                    peer.clone(),
+                                    elapsed.as_millis()
+                                );
+                                break Some((last_known_reply, true, read_half, write_half));
+                            }
+                        } else {
+                            break None;
+                        }
+                    }
+                } else {
+                    None
+                }
+            };
+
+            if let Some(read_write_half) = connection {
+                read_write_half
+            } else {
+                let (read_half, write_half) = connect(&peer).await?;
+                (Instant::now(), false, read_half, write_half)
+            }
+        };
+
         let socket = read_half
             .peer_addr()
             .map_err(|e| ockam_core::Error::new(Origin::Transport, Kind::Internal, e))?;
@@ -118,14 +202,24 @@ impl TcpTransport {
         let receiver_outgoing_access_control =
             options.create_receiver_outgoing_access_control(self.ctx.flow_controls());
 
+        let connection_collector = {
+            if peer.is_localhost() {
+                None
+            } else {
+                Some(Arc::new(ConnectionCollector::new(peer, &self.connections)))
+            }
+        };
+
         TcpSendWorker::start(
             &self.ctx,
             self.registry.clone(),
             write_half,
+            skip_initialization,
             &addresses,
             socket,
             mode,
             &flow_control_id,
+            connection_collector.clone(),
         )
         .await?;
 
@@ -133,11 +227,14 @@ impl TcpTransport {
             &self.ctx,
             self.registry.clone(),
             read_half,
+            skip_initialization,
+            last_known_reply,
             &addresses,
             socket,
             mode,
             &flow_control_id,
             receiver_outgoing_access_control,
+            connection_collector,
         )
         .await?;
 

@@ -4,17 +4,23 @@ mod lifecycle;
 mod listener;
 mod portals;
 
-pub(crate) use common::*;
-
 pub use crate::portal::options::*;
+use crate::TcpRegistry;
+pub(crate) use common::*;
 pub use connection::*;
 pub use listener::*;
-pub use portals::*;
-
-use crate::TcpRegistry;
 use ockam_core::compat::sync::Arc;
 use ockam_core::{async_trait, Result};
 use ockam_node::{Context, HasContext};
+use ockam_transport_core::HostnamePort;
+pub use portals::*;
+use std::collections::{HashMap, VecDeque};
+use std::sync::Mutex as SyncMutex;
+use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
+use tokio::time::Instant;
+
+type CachedConnectionsQueue =
+    SyncMutex<HashMap<HostnamePort, VecDeque<(Instant, OwnedReadHalf, OwnedWriteHalf)>>>;
 
 /// High level management interface for TCP transports
 ///
@@ -58,6 +64,7 @@ use ockam_node::{Context, HasContext};
 pub struct TcpTransport {
     ctx: Arc<Context>,
     registry: TcpRegistry,
+    connections: Arc<CachedConnectionsQueue>,
 
     #[cfg(privileged_portals_support)]
     pub(crate) ebpf_support: Arc<crate::privileged_portal::TcpTransportEbpfSupport>,
@@ -71,6 +78,7 @@ impl TcpTransport {
             registry: TcpRegistry::default(),
             #[cfg(privileged_portals_support)]
             ebpf_support: Default::default(),
+            connections: Default::default(),
         }
     }
 }

@@ -30,7 +30,7 @@ impl From<StaticHostnamePort> for HostnamePort {
 }
 
 /// Hostname and port
-#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, CborLen)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Encode, Decode, CborLen)]
 #[rustfmt::skip]
 pub struct HostnamePort {
     #[n(0)] hostname: String,
@@ -157,6 +157,10 @@ impl HostnamePort {
         }
 
         Ok(HostnamePort::new(hostname, port))
+    }
+
+    pub fn is_localhost(&self) -> bool {
+        self.hostname == "localhost" || self.hostname == "127.0.0.1"
     }
 }
 
