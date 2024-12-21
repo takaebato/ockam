@@ -229,7 +229,7 @@ impl TcpTransport {
         &self,
         addr: impl Into<Address> + Clone + Debug,
     ) -> Result<()> {
-        self.ctx().stop_worker(addr).await?;
+        self.ctx().stop_address(addr).await?;
 
         // TODO: eBPF Remove from the registry
         // self.ebpf_support.outlet_registry

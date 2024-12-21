@@ -1,6 +1,5 @@
 use crate::channel_types::SmallReceiver;
 use crate::tokio::runtime::Handle;
-use crate::AsyncDropSender;
 use core::sync::atomic::AtomicUsize;
 use ockam_core::compat::collections::HashMap;
 use ockam_core::compat::sync::{Arc, RwLock};
@@ -19,21 +18,31 @@ use crate::router::Router;
 use core::fmt::{Debug, Formatter};
 use ockam_core::errcode::{Kind, Origin};
 use ockam_transport_core::Transport;
+use std::sync::Weak;
 
 /// A default timeout in seconds
 pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
 
+/// Context mode depending on the fact if it's attached to a Worker or a Processor
+#[derive(Clone, Copy, Debug)]
+pub enum ContextMode {
+    /// Without a Worker or a Processor
+    Detached,
+    /// With a Worker or a Processor
+    Attached,
+}
+
 /// Context contains Node state and references to the runtime.
 pub struct Context {
     pub(super) mailboxes: Mailboxes,
-    pub(super) router: Arc<Router>,
+    pub(super) router: Weak<Router>,
     pub(super) rt: Handle,
     pub(super) receiver: SmallReceiver<RelayMessage>,
-    pub(super) async_drop_sender: Option<AsyncDropSender>,
     pub(super) mailbox_count: Arc<AtomicUsize>,
     /// List of transports used to resolve external addresses to local workers in routes
     pub(super) transports: Arc<RwLock<HashMap<TransportType, Arc<dyn Transport>>>>,
     pub(super) flow_controls: FlowControls,
+    pub(super) mode: ContextMode,
     #[cfg(feature = "std")]
     pub(super) tracing_context: OpenTelemetryContext,
 }
@@ -51,6 +60,7 @@ impl Debug for Context {
         f.debug_struct("Context")
             .field("mailboxes", &self.mailboxes)
             .field("runtime", &self.rt)
+            .field("mode", &self.mode)
             .finish()
     }
 }
@@ -67,18 +77,20 @@ impl Context {
     }
 
     /// Return a reference to sender
-    pub(crate) fn router(&self) -> Arc<Router> {
+    pub(crate) fn router(&self) -> Result<Arc<Router>> {
+        // FIXME
+        self.router
+            .upgrade()
+            .ok_or_else(|| Error::new(Origin::Node, Kind::Shutdown, "Failed to upgrade router"))
+    }
+
+    pub(crate) fn router_weak(&self) -> Weak<Router> {
         self.router.clone()
     }
 
     /// Return the primary address of the current worker
-    pub fn address(&self) -> Address {
-        self.mailboxes.main_address()
-    }
-
-    /// Return the primary address of the current worker
-    pub fn address_ref(&self) -> &Address {
-        self.mailboxes.main_address_ref()
+    pub fn primary_address(&self) -> &Address {
+        self.mailboxes.primary_address()
     }
 
     /// Return all addresses of the current worker
@@ -125,27 +137,29 @@ impl Context {
     ///
     /// Clusters are de-allocated in reverse order of their
     /// initialisation when the node is stopped.
-    pub async fn set_cluster<S: Into<String>>(&self, label: S) -> Result<()> {
-        self.router.set_cluster(self.address(), label.into())
+    pub fn set_cluster<S: Into<String>>(&self, label: S) -> Result<()> {
+        self.router()?
+            .set_cluster(self.primary_address(), label.into())
     }
 
     /// Return a list of all available worker addresses on a node
-    pub fn list_workers(&self) -> Vec<Address> {
-        self.router.list_workers()
+    pub fn list_workers(&self) -> Result<Vec<Address>> {
+        Ok(self.router()?.list_workers())
     }
 
     /// Return true if a worker is already registered at this address
-    pub fn is_worker_registered_at(&self, address: &Address) -> bool {
-        self.router.is_worker_registered_at(address)
+    pub fn is_worker_registered_at(&self, address: &Address) -> Result<bool> {
+        Ok(self.router()?.is_worker_registered_at(address))
     }
 
     /// Send a shutdown acknowledgement to the router
-    pub(crate) async fn stop_ack(&self) -> Result<()> {
-        self.router.stop_ack(self.address()).await
+    pub(crate) fn stop_ack(&self) -> Result<()> {
+        // FIXME
+        self.router()?.stop_ack(self.primary_address())
     }
 
     /// Finds the terminal address of a route, if present
-    pub async fn find_terminal_address(
+    pub fn find_terminal_address(
         &self,
         route: impl Into<Vec<Address>>,
     ) -> Result<Option<AddressAndMetadata>> {
@@ -158,11 +172,11 @@ impl Context {
             ));
         }
 
-        Ok(self.router.find_terminal_address(addresses))
+        Ok(self.router()?.find_terminal_address(addresses))
     }
 
     /// Read metadata for the provided address
-    pub fn get_metadata(&self, address: impl Into<Address>) -> Option<AddressMetadata> {
-        self.router.get_address_metadata(&address.into())
+    pub fn get_metadata(&self, address: impl Into<Address>) -> Result<Option<AddressMetadata>> {
+        Ok(self.router()?.get_address_metadata(&address.into()))
     }
 }

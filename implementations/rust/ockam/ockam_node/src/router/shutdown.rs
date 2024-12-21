@@ -1,7 +1,6 @@
 use super::Router;
-use alloc::sync::Arc;
-use alloc::vec::Vec;
-use ockam_core::{Address, Result};
+use ockam_core::Result;
+use std::sync::Arc;
 
 /// Register a stop ACK
 ///
@@ -16,7 +15,7 @@ impl Router {
         info!("Initiate graceful node shutdown");
         // This changes the router state to `Stopping`
         let receiver = self.state.shutdown();
-        let mut receiver = if let Some(receiver) = receiver {
+        let receiver = if let Some(receiver) = receiver {
             receiver
         } else {
             debug!("Node is already terminated");
@@ -24,21 +23,15 @@ impl Router {
         };
 
         // Start by shutting down clusterless workers
-        let cluster = self.map.stop_all_non_cluster_workers().await;
+        let no_non_cluster_workers = self.map.stop_all_non_cluster_workers();
 
-        // If there _are_ no clusterless workers we go to the next cluster
-        if cluster.is_empty() {
-            let result = self.stop_next_cluster().await;
-            if let Ok(true) = result {
-                self.state.terminate().await;
-                return Ok(());
-            }
+        // Not stop cluster addresses
+        let no_cluster_workers = self.map.stop_all_cluster_workers();
+
+        if no_non_cluster_workers && no_cluster_workers {
+            // No stop ack will arrive because we didn't stop anything
+            return Ok(());
         }
-
-        // Otherwise: keep track of addresses we are stopping
-        cluster
-            .into_iter()
-            .for_each(|addr| self.map.init_stop(addr));
 
         // Start a timeout task to interrupt us...
         #[cfg(feature = "std")]
@@ -50,32 +43,18 @@ impl Router {
             task::spawn(async move {
                 time::sleep(dur).await;
                 warn!("Shutdown timeout reached; aborting node!");
-                self.map.clear_address_records_map();
-                self.state.terminate().await;
+                let uncleared_addresses = self.map.force_clear_records();
+
+                if !uncleared_addresses.is_empty() {
+                    error!("Router internal inconsistency detected. Records map is not empty after stopping all workers. Addresses: {:?}", uncleared_addresses);
+                }
+
+                self.state.terminate();
             });
         }
 
-        receiver.recv().await;
-        Ok(())
-    }
+        receiver.await.unwrap(); //FIXME
 
-    pub(crate) async fn stop_next_cluster(&self) -> Result<bool> {
-        let next_cluster_addresses = self.map.next_cluster();
-
-        match next_cluster_addresses {
-            Some(vec) => {
-                self.stop_cluster_addresses(vec).await?;
-                Ok(false)
-            }
-            // If not, we are done!
-            None => Ok(true),
-        }
-    }
-
-    async fn stop_cluster_addresses(&self, addresses: Vec<Address>) -> Result<()> {
-        for address in addresses.iter() {
-            self.map.stop(address).await?;
-        }
         Ok(())
     }
 }

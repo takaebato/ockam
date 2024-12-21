@@ -62,32 +62,4 @@ impl Router {
         self.map
             .insert_address_record(primary_addr.clone(), address_record, addresses_metadata)
     }
-
-    /// Stop the worker
-    pub async fn stop_worker(&self, addr: &Address, detached: bool) -> Result<()> {
-        debug!("Stopping worker '{}'", addr);
-
-        // Resolve any secondary address to the primary address
-        let primary_address = match self.map.get_primary_address(addr) {
-            Some(p) => p,
-            None => {
-                return Err(Error::new(Origin::Node, Kind::NotFound, "No such address")
-                    .context("Address", addr))
-            }
-        };
-
-        // If we are dropping a real worker, then we simply close the
-        // mailbox channel to trigger a graceful worker self-shutdown.
-        // The worker shutdown will call `free_address()`.
-        //
-        // For detached workers (i.e. Context's without a mailbox relay
-        // running) we simply free the address.
-        if detached {
-            self.map.free_address(&primary_address);
-        } else {
-            self.map.stop(&primary_address).await?;
-        }
-
-        Ok(())
-    }
 }

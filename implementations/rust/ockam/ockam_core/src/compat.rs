@@ -30,6 +30,17 @@ pub mod collections {
     pub use alloc::collections::{BTreeMap, BTreeSet, BinaryHeap, LinkedList, VecDeque};
 
     pub use hashbrown::{HashMap, HashSet};
+
+    /// hash map
+    pub mod hash_map {
+        pub use hashbrown::hash_map::{Entry, EntryRef};
+    }
+
+    /// btree map
+    #[cfg(feature = "alloc")]
+    pub mod btree_map {
+        pub use alloc::collections::btree_map::Entry;
+    }
 }
 
 /// Provides a `std::error::Error` trait.

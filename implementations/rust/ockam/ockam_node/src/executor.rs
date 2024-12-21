@@ -1,9 +1,6 @@
+use crate::router::{Router, SenderPair};
 #[cfg(feature = "std")]
 use crate::runtime;
-use crate::{
-    router::{Router, SenderPair},
-    tokio::runtime::Runtime,
-};
 use core::future::Future;
 use ockam_core::{compat::sync::Arc, Address, Result};
 
@@ -14,16 +11,16 @@ use crate::metrics::Metrics;
 // collector, thus don't need it in scope.
 #[cfg(feature = "metrics")]
 use core::sync::atomic::{AtomicBool, Ordering};
-
-#[cfg(feature = "std")]
-use opentelemetry::trace::FutureExt;
-
 use ockam_core::flow_control::FlowControls;
 #[cfg(feature = "std")]
 use ockam_core::{
     errcode::{Kind, Origin},
     Error,
 };
+#[cfg(feature = "std")]
+use opentelemetry::trace::FutureExt;
+use std::sync::Weak;
+use tokio::runtime::Runtime;
 
 /// Underlying Ockam node executor
 ///
@@ -32,7 +29,7 @@ use ockam_core::{
 /// `ockam::node` function annotation instead!
 pub struct Executor {
     /// Reference to the runtime needed to spawn tasks
-    rt: Arc<Runtime>,
+    runtime: Arc<Runtime>,
     /// Application router
     router: Arc<Router>,
     /// Metrics collection endpoint
@@ -42,12 +39,12 @@ pub struct Executor {
 
 impl Executor {
     /// Create a new Ockam node [`Executor`] instance
-    pub fn new(rt: Arc<Runtime>, flow_controls: &FlowControls) -> Self {
+    pub fn new(runtime: Arc<Runtime>, flow_controls: &FlowControls) -> Self {
         let router = Arc::new(Router::new(flow_controls));
         #[cfg(feature = "metrics")]
-        let metrics = Metrics::new(&rt, router.get_metrics_readout());
+        let metrics = Metrics::new(runtime.handle().clone(), router.get_metrics_readout());
         Self {
-            rt,
+            runtime,
             router,
             #[cfg(feature = "metrics")]
             metrics,
@@ -55,8 +52,8 @@ impl Executor {
     }
 
     /// Get access to the internal message sender
-    pub(crate) fn router(&self) -> Arc<Router> {
-        self.router.clone()
+    pub(crate) fn router(&self) -> Weak<Router> {
+        Arc::downgrade(&self.router)
     }
 
     /// Initialize the root application worker
@@ -87,16 +84,11 @@ impl Executor {
         #[cfg(feature = "metrics")]
         let alive = Arc::new(AtomicBool::from(true));
         #[cfg(feature = "metrics")]
-        self.rt.spawn(
-            self.metrics
-                .clone()
-                .run(alive.clone())
-                .with_current_context(),
-        );
+        self.metrics.clone().spawn(alive.clone());
 
         // Spawn user code second
         let future = Executor::wrapper(self.router.clone(), future);
-        let join_body = self.rt.spawn(future.with_current_context());
+        let join_body = self.runtime.spawn(future.with_current_context());
 
         // Shut down metrics collector
         #[cfg(feature = "metrics")]
@@ -104,9 +96,12 @@ impl Executor {
 
         // Last join user code
         let res = self
-            .rt
+            .runtime
             .block_on(join_body)
             .map_err(|e| Error::new(Origin::Executor, Kind::Unknown, e))?;
+
+        // TODO: Shutdown Runtime if we exclusively own it. Which should be always except when we
+        //  run multiple nodes inside the same process
 
         Ok(res)
     }
@@ -130,15 +125,10 @@ impl Executor {
         #[cfg(feature = "metrics")]
         let alive = Arc::new(AtomicBool::from(true));
         #[cfg(feature = "metrics")]
-        self.rt.spawn(
-            self.metrics
-                .clone()
-                .run(alive.clone())
-                .with_current_context(),
-        );
+        self.metrics.clone().spawn(alive.clone());
 
         // Spawn user code second
-        let join_body = self.rt.spawn(future.with_current_context());
+        let join_body = self.runtime.spawn(future.with_current_context());
 
         // Shut down metrics collector
         #[cfg(feature = "metrics")]
@@ -146,7 +136,7 @@ impl Executor {
 
         // Last join user code
         let res = self
-            .rt
+            .runtime
             .block_on(join_body)
             .map_err(|e| Error::new(Origin::Executor, Kind::Unknown, e))?;
 
@@ -161,17 +151,11 @@ impl Executor {
     {
         match future.await {
             Ok(val) => {
+                // TODO: Add timeout here
                 router.wait_termination().await;
                 Ok(val)
             }
             Err(e) => {
-                // We earlier sent the AbortNode message to the router here.
-                // It failed because the router state was not set to `Stopping`
-                // But sending Graceful shutdown message works because, it internally does that.
-                //
-                // I think way AbortNode is implemented right now, it is more of an
-                // internal/private message not meant to be directly used, without changing the
-                // router state.
                 if let Err(error) = router.stop_graceful(1).await {
                     error!("Failed to stop gracefully: {}", error);
                 }

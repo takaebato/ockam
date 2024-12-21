@@ -72,7 +72,7 @@ impl RemoteRelay {
         let addresses = Addresses::generate(RelayType::Static);
 
         let mut callback_ctx = ctx
-            .new_detached_with_mailboxes(Mailboxes::main(
+            .new_detached_with_mailboxes(Mailboxes::primary(
                 addresses.completion_callback.clone(),
                 Arc::new(AllowSourceAddress(addresses.main_remote.clone())),
                 Arc::new(DenyAll),
@@ -117,7 +117,7 @@ impl RemoteRelay {
         let addresses = Addresses::generate(RelayType::Ephemeral);
 
         let mut callback_ctx = ctx
-            .new_detached_with_mailboxes(Mailboxes::main(
+            .new_detached_with_mailboxes(Mailboxes::primary(
                 addresses.completion_callback.clone(),
                 Arc::new(AllowSourceAddress(addresses.main_remote.clone())),
                 Arc::new(DenyAll),

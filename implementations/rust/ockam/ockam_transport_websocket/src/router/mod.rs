@@ -117,8 +117,7 @@ impl Worker for WebSocketRouter {
     type Context = Context;
 
     async fn initialize(&mut self, ctx: &mut Context) -> Result<()> {
-        ctx.set_cluster(crate::CLUSTER_NAME).await?;
-        Ok(())
+        ctx.set_cluster(crate::CLUSTER_NAME)
     }
 
     async fn handle_message(&mut self, ctx: &mut Context, msg: Routed<Any>) -> Result<()> {

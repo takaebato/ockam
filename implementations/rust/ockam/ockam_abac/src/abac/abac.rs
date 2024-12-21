@@ -59,18 +59,16 @@ impl Abac {
 }
 
 impl Abac {
-    pub async fn get_outgoing_identifier(
+    pub fn get_outgoing_identifier(
         ctx: &Context,
         relay_msg: &RelayMessage,
     ) -> Result<Option<Identifier>> {
-        let terminal = if let Some(terminal) = ctx
-            .find_terminal_address(relay_msg.onward_route().clone())
-            .await?
-        {
-            terminal
-        } else {
-            return Ok(None);
-        };
+        let terminal =
+            if let Some(terminal) = ctx.find_terminal_address(relay_msg.onward_route().clone())? {
+                terminal
+            } else {
+                return Ok(None);
+            };
 
         if let Ok(metadata) = SecureChannelMetadata::from_terminal_address(&terminal) {
             Ok(Some(metadata.their_identifier().into()))

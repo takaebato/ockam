@@ -61,7 +61,7 @@ impl Processor for UdsListenProcessor {
     type Context = Context;
 
     async fn initialize(&mut self, ctx: &mut Context) -> Result<()> {
-        ctx.set_cluster(crate::CLUSTER_NAME).await
+        ctx.set_cluster(crate::CLUSTER_NAME)
     }
 
     /// Listen for and accept incoming UDS connections.

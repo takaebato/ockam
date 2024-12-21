@@ -110,7 +110,7 @@ impl Worker for BleRouter {
     type Message = Any;
 
     async fn initialize(&mut self, ctx: &mut Context) -> Result<()> {
-        ctx.set_cluster(crate::CLUSTER_NAME).await?;
+        ctx.set_cluster(crate::CLUSTER_NAME)?;
         Ok(())
     }
 

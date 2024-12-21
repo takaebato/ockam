@@ -7,13 +7,14 @@ pub mod worker;
 #[cfg(feature = "metrics")]
 use core::sync::atomic::AtomicUsize;
 
-use crate::channel_types::{MessageSender, SmallSender};
+use crate::channel_types::{MessageSender, OneshotSender};
 use crate::relay::CtrlSignal;
 use crate::{NodeError, NodeReason};
 use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
-use ockam_core::compat::collections::BTreeMap;
+use ockam_core::compat::collections::hash_map::Entry;
+use ockam_core::compat::collections::HashMap;
 use ockam_core::compat::sync::RwLock as SyncRwLock;
 use ockam_core::errcode::{Kind, Origin};
 use ockam_core::flow_control::FlowControls;
@@ -27,7 +28,7 @@ use state::{NodeState, RouterState};
 #[derive(Debug)]
 pub struct SenderPair {
     pub msgs: MessageSender<RelayMessage>,
-    pub ctrl: SmallSender<CtrlSignal>,
+    pub ctrl: OneshotSender<CtrlSignal>,
 }
 
 /// A combined address type and local worker router
@@ -45,7 +46,7 @@ pub struct Router {
     /// Internal address state
     map: InternalMap,
     /// Externally registered router components
-    external: SyncRwLock<BTreeMap<TransportType, Address>>,
+    external: SyncRwLock<HashMap<TransportType, Address>>,
 }
 
 enum RouteType {
@@ -87,8 +88,8 @@ impl Router {
         )
     }
 
-    pub fn set_cluster(&self, addr: Address, label: String) -> Result<()> {
-        self.map.set_cluster(label, addr)
+    pub fn set_cluster(&self, addr: &Address, label: String) -> Result<()> {
+        self.map.set_cluster(addr, label)
     }
 
     pub fn list_workers(&self) -> Vec<Address> {
@@ -99,25 +100,15 @@ impl Router {
         self.map.is_worker_registered_at(address)
     }
 
-    pub async fn stop_ack(&self, addr: Address) -> Result<()> {
+    pub fn stop_ack(&self, primary_address: &Address) -> Result<()> {
         let running = self.state.running();
-        debug!(%running, "Handling shutdown ACK for {}", addr);
-        self.map.free_address(&addr);
+        debug!(%running, "Handling shutdown ACK for {}", primary_address);
 
-        if !running {
-            // The router is shutting down
-            if !self.map.cluster_done() {
-                // We are not done yet.
-                // The last worker should call another `stop_ack`
-                return Ok(());
-            }
-
-            // Check if there is a next cluster
-            let finished = self.stop_next_cluster().await?;
-            if finished {
-                self.state.terminate().await;
-            }
+        let empty = self.map.stop_ack(primary_address);
+        if !running && empty {
+            self.state.terminate();
         }
+
         Ok(())
     }
 
@@ -130,8 +121,7 @@ impl Router {
     }
 
     pub fn register_router(&self, tt: TransportType, addr: Address) -> Result<()> {
-        let mut guard = self.external.write().unwrap();
-        if let alloc::collections::btree_map::Entry::Vacant(e) = guard.entry(tt) {
+        if let Entry::Vacant(e) = self.external.write().unwrap().entry(tt) {
             e.insert(addr);
             Ok(())
         } else {
@@ -161,8 +151,17 @@ impl Router {
             .ok_or_else(|| NodeError::NodeState(NodeReason::Unknown).internal())
     }
 
-    pub async fn wait_termination(self: Arc<Self>) {
+    pub async fn wait_termination(&self) {
         self.state.wait_termination().await;
+    }
+
+    /// Stop the worker
+    pub fn stop_address(&self, addr: &Address) -> Result<()> {
+        debug!("Stopping address '{}'", addr);
+
+        self.map.stop(addr)?;
+
+        Ok(())
     }
 
     #[cfg(feature = "metrics")]

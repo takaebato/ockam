@@ -132,7 +132,7 @@ impl UdsRouter {
 
         self.handle_unregister(self_address.clone()).await?;
 
-        self.ctx.stop_worker(self_address).await?;
+        self.ctx.stop_address(self_address)?;
 
         Ok(())
     }
@@ -259,8 +259,7 @@ impl Worker for UdsRouter {
     type Message = Any;
 
     async fn initialize(&mut self, ctx: &mut Context) -> Result<()> {
-        ctx.set_cluster(crate::CLUSTER_NAME).await?;
-        Ok(())
+        ctx.set_cluster(crate::CLUSTER_NAME)
     }
 
     async fn handle_message(&mut self, ctx: &mut Context, msg: Routed<Any>) -> Result<()> {

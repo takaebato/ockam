@@ -218,7 +218,7 @@ impl TestNode {
     }
 
     pub async fn create(runtime: Arc<Runtime>, listen_addr: Option<&str>) -> Self {
-        let (mut context, _executor) = NodeBuilder::new().with_runtime(runtime.clone()).build();
+        let (mut context, _executor) = NodeBuilder::new().with_runtime(runtime).build();
         let node_manager_handle = start_manager_for_tests(
             &mut context,
             listen_addr,

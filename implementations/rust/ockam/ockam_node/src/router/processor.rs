@@ -59,22 +59,4 @@ impl Router {
         self.map
             .insert_address_record(primary_addr.clone(), record, addresses_metadata)
     }
-
-    /// Stop the processor
-    pub(crate) async fn stop_processor(&self, addr: &Address) -> Result<()> {
-        trace!("Stopping processor '{}'", addr);
-
-        // Resolve any secondary address to the primary address
-        let primary_address = match self.map.get_primary_address(addr) {
-            Some(p) => p.clone(),
-            None => {
-                return Err(Error::new(Origin::Node, Kind::NotFound, "No such address")
-                    .context("Address", addr.clone()))
-            }
-        };
-
-        // Then send processor shutdown signal
-        self.map.stop(&primary_address).await?;
-        Ok(())
-    }
 }

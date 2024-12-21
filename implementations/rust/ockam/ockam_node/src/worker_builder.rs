@@ -1,4 +1,4 @@
-use crate::debugger;
+use crate::{debugger, ContextMode};
 use crate::{relay::WorkerRelay, Context};
 use alloc::string::String;
 use ockam_core::compat::{sync::Arc, vec::Vec};
@@ -192,7 +192,7 @@ where
     pub async fn start(self, context: &Context) -> Result<()> {
         start(
             context,
-            Mailboxes::main(self.address, self.incoming_ac, self.outgoing_ac),
+            Mailboxes::primary(self.address, self.incoming_ac, self.outgoing_ac),
             self.worker,
             self.metadata.map(|m| vec![m]).unwrap_or_default(),
         )
@@ -253,19 +253,19 @@ where
 {
     debug!(
         "Initializing ockam worker '{}' with access control in:{:?} out:{:?}",
-        mailboxes.main_address(),
-        mailboxes.main_mailbox().incoming_access_control(),
-        mailboxes.main_mailbox().outgoing_access_control(),
+        mailboxes.primary_address(),
+        mailboxes.primary_mailbox().incoming_access_control(),
+        mailboxes.primary_mailbox().outgoing_access_control(),
     );
 
     let addresses = mailboxes.addresses();
 
     // Pass it to the context
-    let (ctx, sender, ctrl_rx) = context.copy_with_mailboxes(mailboxes);
+    let (ctx, sender, ctrl_rx) = context.new_with_mailboxes(mailboxes, ContextMode::Attached);
 
     debugger::log_inherit_context("WORKER", context, &ctx);
 
-    let router = context.router();
+    let router = context.router()?;
     router.start_worker(addresses, sender, false, metadata, context.mailbox_count())?;
 
     // Then initialise the worker message relay

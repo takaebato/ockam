@@ -1,4 +1,4 @@
-use crate::channel_types::SmallReceiver;
+use crate::channel_types::OneshotReceiver;
 use crate::{relay::CtrlSignal, tokio::runtime::Handle, Context};
 use ockam_core::{Processor, Result};
 
@@ -20,17 +20,17 @@ where
 
     #[cfg_attr(not(feature = "std"), allow(unused_mut))]
     #[cfg_attr(not(feature = "std"), allow(unused_variables))]
-    async fn run(self, mut ctrl_rx: SmallReceiver<CtrlSignal>) {
+    async fn run(self, ctrl_rx: OneshotReceiver<CtrlSignal>) {
         let mut ctx = self.ctx;
         let mut processor = self.processor;
-        let ctx_addr = ctx.address();
+        let ctx_addr = ctx.primary_address().clone();
 
         match processor.initialize(&mut ctx).await {
             Ok(()) => {}
             Err(e) => {
                 error!(
                     "Failure during '{}' processor initialisation: {}",
-                    ctx.address(),
+                    ctx.primary_address(),
                     e
                 );
                 shutdown_and_stop_ack(&mut processor, &mut ctx, &ctx_addr).await;
@@ -64,12 +64,10 @@ where
 
         #[cfg(feature = "std")]
         {
-            // This future resolves when a stop control signal is received
-            let shutdown_signal = async { ctrl_rx.recv().await };
-
-            // Then select over the two futures
+            // Select over the two futures
             tokio::select! {
-                _ = shutdown_signal => {
+                // This future resolves when a stop control signal is received
+                _ = ctrl_rx => {
                     debug!("Shutting down processor {} due to shutdown signal", ctx_addr);
                 },
                 _ = run_loop => {}
@@ -92,7 +90,7 @@ where
         rt: &Handle,
         processor: P,
         ctx: Context,
-        ctrl_rx: SmallReceiver<CtrlSignal>,
+        ctrl_rx: OneshotReceiver<CtrlSignal>,
     ) {
         let relay = ProcessorRelay::<P>::new(processor, ctx);
         rt.spawn(relay.run(ctrl_rx));
@@ -115,7 +113,7 @@ async fn shutdown_and_stop_ack<P>(
 
     // Finally send the router a stop ACK -- log errors
     trace!("Sending shutdown ACK");
-    ctx.stop_ack().await.unwrap_or_else(|e| {
+    ctx.stop_ack().unwrap_or_else(|e| {
         error!("Failed to send stop ACK for '{}': {}", ctx_addr, e);
     });
 }

@@ -24,8 +24,7 @@ async fn find_terminal_for_processor(context: &mut Context) -> Result<()> {
         .await?;
 
     assert!(context
-        .find_terminal_address(route!["simple_processor", "non-existing"])
-        .await?
+        .find_terminal_address(route!["simple_processor", "non-existing"])?
         .is_none());
 
     ProcessorBuilder::new(NullProcessor {})
@@ -40,8 +39,7 @@ async fn find_terminal_for_processor(context: &mut Context) -> Result<()> {
                 "simple_worker",
                 "terminal_processor",
                 "non-existing"
-            ])
-            .await?
+            ])?
             .unwrap()
             .address,
         "terminal_processor".into()
@@ -62,24 +60,21 @@ async fn find_terminal_for_processor_alias(context: &mut Context) -> Result<()> 
         .await?;
 
     assert!(context
-        .find_terminal_address(route!["main", "non-existing"])
-        .await?
+        .find_terminal_address(route!["main", "non-existing"])?
         .is_none());
 
     assert_eq!(
         context
-            .find_terminal_address(route!["main", "alias", "other"])
-            .await?
+            .find_terminal_address(route!["main", "alias", "other"])?
             .unwrap()
             .address,
         "alias".into()
     );
 
-    context.stop_processor("main").await?;
+    context.stop_address("main")?;
     ockam_node::compat::tokio::time::sleep(std::time::Duration::from_millis(10)).await;
     assert!(context
-        .find_terminal_address(route!["main", "alias", "other"])
-        .await?
+        .find_terminal_address(route!["main", "alias", "other"])?
         .is_none());
 
     context.stop().await
@@ -94,7 +89,7 @@ async fn provide_and_read_processor_address_metadata(context: &mut Context) -> R
         .start(context)
         .await?;
 
-    let meta = context.get_metadata("processor_address").unwrap();
+    let meta = context.get_metadata("processor_address")?.unwrap();
 
     assert!(!meta.is_terminal);
 
@@ -106,11 +101,11 @@ async fn provide_and_read_processor_address_metadata(context: &mut Context) -> R
         ]
     );
 
-    assert_eq!(context.get_metadata("non-existing-worker"), None);
+    assert_eq!(context.get_metadata("non-existing-worker")?, None);
 
-    context.stop_processor("processor_address").await?;
+    context.stop_address("processor_address")?;
     ockam_node::compat::tokio::time::sleep(std::time::Duration::from_millis(10)).await;
-    assert_eq!(context.get_metadata("processor_address"), None);
+    assert_eq!(context.get_metadata("processor_address")?, None);
 
     context.stop().await
 }
@@ -123,8 +118,7 @@ async fn find_terminal_for_worker(context: &mut Context) -> Result<()> {
         .await?;
 
     assert!(context
-        .find_terminal_address(route!["simple_worker", "non-existing"])
-        .await?
+        .find_terminal_address(route!["simple_worker", "non-existing"])?
         .is_none());
 
     WorkerBuilder::new(NullWorker {})
@@ -135,8 +129,7 @@ async fn find_terminal_for_worker(context: &mut Context) -> Result<()> {
 
     assert_eq!(
         context
-            .find_terminal_address(route!["simple_worker", "terminal_worker", "non-existing"])
-            .await?
+            .find_terminal_address(route!["simple_worker", "terminal_worker", "non-existing"])?
             .unwrap()
             .address,
         "terminal_worker".into()
@@ -150,15 +143,12 @@ async fn find_terminal_for_worker(context: &mut Context) -> Result<()> {
             "terminal_worker",
             "non-existing"
         ])
-        .await
         .is_err());
 
-    context.stop_worker("terminal_worker").await?;
+    context.stop_address("terminal_worker")?;
     ockam_node::compat::tokio::time::sleep(std::time::Duration::from_millis(10)).await;
     assert_eq!(
-        context
-            .find_terminal_address(route!["terminal_worker"])
-            .await?,
+        context.find_terminal_address(route!["terminal_worker"])?,
         None
     );
 
@@ -177,24 +167,21 @@ async fn find_terminal_for_worker_alias(context: &mut Context) -> Result<()> {
         .await?;
 
     assert!(context
-        .find_terminal_address(route!["main", "non-existing"])
-        .await?
+        .find_terminal_address(route!["main", "non-existing"])?
         .is_none());
 
     assert_eq!(
         context
-            .find_terminal_address(route!["main", "alias", "other"])
-            .await?
+            .find_terminal_address(route!["main", "alias", "other"])?
             .unwrap()
             .address,
         "alias".into()
     );
 
-    context.stop_worker("main").await?;
+    context.stop_address("main")?;
     ockam_node::compat::tokio::time::sleep(std::time::Duration::from_millis(10)).await;
     assert!(context
-        .find_terminal_address(route!["main", "alias", "other"])
-        .await?
+        .find_terminal_address(route!["main", "alias", "other"])?
         .is_none());
 
     context.stop().await
@@ -209,7 +196,7 @@ async fn provide_and_read_address_metadata(context: &mut Context) -> Result<()> 
         .start(context)
         .await?;
 
-    let meta = context.get_metadata("worker_address").unwrap();
+    let meta = context.get_metadata("worker_address")?.unwrap();
 
     assert!(!meta.is_terminal);
 
@@ -221,11 +208,11 @@ async fn provide_and_read_address_metadata(context: &mut Context) -> Result<()> 
         ]
     );
 
-    assert_eq!(context.get_metadata("non-existing-worker"), None);
+    assert_eq!(context.get_metadata("non-existing-worker")?, None);
 
-    context.stop_worker("worker_address").await?;
+    context.stop_address("worker_address")?;
     ockam_node::compat::tokio::time::sleep(std::time::Duration::from_millis(10)).await;
-    assert_eq!(context.get_metadata("worker_address"), None);
+    assert_eq!(context.get_metadata("worker_address")?, None);
 
     context.stop().await
 }
@@ -242,7 +229,7 @@ async fn provide_and_read_address_metadata_worker_alias(context: &mut Context) -
         .start(context)
         .await?;
 
-    let meta = context.get_metadata("alias").unwrap();
+    let meta = context.get_metadata("alias")?.unwrap();
 
     assert!(!meta.is_terminal);
 
@@ -251,9 +238,9 @@ async fn provide_and_read_address_metadata_worker_alias(context: &mut Context) -
         vec![("TEST_KEY_2".to_string(), "TEST_VALUE_2".to_string())]
     );
 
-    context.stop_worker("main").await?;
+    context.stop_address("main")?;
     ockam_node::compat::tokio::time::sleep(std::time::Duration::from_millis(10)).await;
-    assert_eq!(context.get_metadata("alias"), None);
+    assert_eq!(context.get_metadata("alias")?, None);
 
     context.stop().await
 }

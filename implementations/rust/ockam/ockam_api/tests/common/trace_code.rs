@@ -13,6 +13,8 @@ use std::future::Future;
 ///
 ///  - the return value of the function
 ///  - all the exported spans
+///
+/// FIXME: Is it needed? It's unused
 pub fn trace_code<F>(f: impl Fn(Context) -> F + Send + Sync + 'static) -> (F::Output, Vec<SpanData>)
 where
     F: Future + Send + 'static,

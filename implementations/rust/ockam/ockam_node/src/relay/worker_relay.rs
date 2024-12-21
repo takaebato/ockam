@@ -1,4 +1,4 @@
-use crate::channel_types::SmallReceiver;
+use crate::channel_types::OneshotReceiver;
 use crate::relay::CtrlSignal;
 use crate::tokio::runtime::Handle;
 use crate::Context;
@@ -60,7 +60,7 @@ where
         let relay_msg = match self.ctx.receiver_next().await? {
             Some(msg) => msg,
             None => {
-                trace!("No more messages for worker {}", self.ctx.address());
+                trace!("No more messages for worker {}", self.ctx.primary_address());
                 return Ok(false);
             }
         };
@@ -95,13 +95,13 @@ where
 
     #[cfg_attr(not(feature = "std"), allow(unused_mut))]
     #[cfg_attr(not(feature = "std"), allow(unused_variables))]
-    async fn run(mut self, mut ctrl_rx: SmallReceiver<CtrlSignal>) {
+    async fn run(mut self, mut ctrl_rx: OneshotReceiver<CtrlSignal>) {
         match self.worker.initialize(&mut self.ctx).await {
             Ok(()) => {}
             Err(e) => {
                 error!(
                     "Failure during '{}' worker initialisation: {}",
-                    self.ctx.address(),
+                    self.ctx.primary_address(),
                     e
                 );
                 self.shutdown_and_stop_ack().await;
@@ -109,7 +109,7 @@ where
             }
         }
 
-        let address = self.ctx.address();
+        let address = self.ctx.primary_address().clone();
 
         #[cfg(feature = "std")]
         loop {
@@ -131,11 +131,9 @@ where
                         }
                     }
                 },
-                result = ctrl_rx.recv() => {
-                    if result.is_some() {
-                        debug!("Relay received shutdown signal, terminating!");
-                        break;
-                    }
+                _ = &mut ctrl_rx => {
+                    debug!("Relay received shutdown signal, terminating!");
+                    break;
 
                     // We are stopping
                 }
@@ -168,7 +166,7 @@ where
             Err(e) => {
                 error!(
                     "Failure during '{}' worker shutdown: {}",
-                    self.ctx.address(),
+                    self.ctx.primary_address(),
                     e
                 );
             }
@@ -176,17 +174,17 @@ where
 
         // Finally send the router a stop ACK -- log errors
         trace!("Sending shutdown ACK");
-        self.ctx.stop_ack().await.unwrap_or_else(|e| {
+        self.ctx.stop_ack().unwrap_or_else(|e| {
             error!(
                 "Failed to send stop ACK for worker '{}': {}",
-                self.ctx.address(),
+                self.ctx.primary_address(),
                 e
             )
         });
     }
 
     /// Build and spawn a new worker relay, returning a send handle to it
-    pub(crate) fn init(rt: &Handle, worker: W, ctx: Context, ctrl_rx: SmallReceiver<CtrlSignal>) {
+    pub(crate) fn init(rt: &Handle, worker: W, ctx: Context, ctrl_rx: OneshotReceiver<CtrlSignal>) {
         let relay = WorkerRelay::new(worker, ctx);
         rt.spawn(relay.run(ctrl_rx));
     }

@@ -83,7 +83,7 @@ impl UdpPunctureReceiverWorker {
 
         let heartbeat_mailbox = Mailbox::new(
             addresses.heartbeat_address().clone(),
-            Arc::new(AllowSourceAddress(heartbeat.address())),
+            Arc::new(AllowSourceAddress(heartbeat.address().clone())),
             Arc::new(DenyAll),
         );
 
@@ -216,8 +216,7 @@ impl UdpPunctureReceiverWorker {
                 .send(UdpPunctureNotification::Closed);
 
             // Shut down itself
-            ctx.stop_worker(self.addresses.remote_address().clone())
-                .await?;
+            ctx.stop_address(self.addresses.remote_address().clone())?;
 
             return Ok(());
         }
@@ -256,7 +255,7 @@ impl UdpPunctureReceiverWorker {
         let res = self.handle_heartbeat_impl(ctx).await;
 
         // Schedule next heartbeat here in case something errors
-        self.heartbeat.schedule(HEARTBEAT_INTERVAL).await?;
+        self.heartbeat.schedule(HEARTBEAT_INTERVAL)?;
 
         res
     }
@@ -268,19 +267,15 @@ impl Worker for UdpPunctureReceiverWorker {
     type Context = Context;
 
     async fn initialize(&mut self, _context: &mut Self::Context) -> Result<()> {
-        self.heartbeat.schedule(Duration::ZERO).await?;
-
-        Ok(())
+        self.heartbeat.schedule(Duration::ZERO)
     }
 
     async fn shutdown(&mut self, ctx: &mut Self::Context) -> Result<()> {
         self.heartbeat.cancel();
 
-        _ = ctx
-            .stop_worker(self.addresses.sender_address().clone())
-            .await;
+        _ = ctx.stop_address(self.addresses.sender_address().clone());
 
-        _ = ctx.stop_worker(self.bind.sender_address().clone()).await;
+        _ = ctx.stop_address(self.bind.sender_address().clone());
 
         Ok(())
     }

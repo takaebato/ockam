@@ -172,7 +172,7 @@ async fn worker_initialize_fail_should_shutdown(ctx: &mut Context) -> Result<()>
     sleep(Duration::new(1, 0)).await;
     assert!(shutdown_was_called.load(Ordering::Relaxed));
 
-    assert!(!ctx.list_workers().contains(&address));
+    assert!(!ctx.list_workers()?.contains(&address));
 
     Ok(())
 }
@@ -207,7 +207,7 @@ async fn processor_initialize_fail_should_shutdown(ctx: &mut Context) -> Result<
     assert!(res.is_ok());
     sleep(Duration::new(1, 0)).await;
     assert!(shutdown_was_called.load(Ordering::Relaxed));
-    assert!(!ctx.list_workers().contains(&address));
+    assert!(!ctx.list_workers()?.contains(&address));
 
     Ok(())
 }
@@ -336,7 +336,7 @@ async fn waiting_processor__shutdown__should_be_interrupted(ctx: &mut Context) -
     ctx.start_processor("waiting_processor", processor).await?;
     sleep(Duration::from_secs(1)).await;
 
-    ctx.stop_processor("waiting_processor").await?;
+    ctx.stop_address("waiting_processor")?;
     sleep(Duration::from_secs(1)).await;
 
     assert!(initialize_was_called.load(Ordering::Relaxed));
@@ -462,7 +462,7 @@ impl Worker for StopFromHandleMessageWorker {
     type Context = Context;
     async fn handle_message(&mut self, ctx: &mut Context, _msg: Routed<String>) -> Result<()> {
         self.counter_a.fetch_add(1, Ordering::Relaxed);
-        ctx.stop_worker(ctx.address()).await?;
+        ctx.stop_address(ctx.primary_address())?;
         self.counter_b.fetch_add(1, Ordering::Relaxed);
         Ok(())
     }
@@ -645,4 +645,20 @@ async fn message_handle__error_during_handling__keep_worker_running(
     assert_eq!(3, counter.load(Ordering::Relaxed));
 
     Ok(())
+}
+
+#[test]
+fn test1() {
+    let (ctx, mut executor) = NodeBuilder::new().build();
+
+    executor
+        .execute::<_, (), ockam_core::Error>(async move {
+            ctx.sleep(Duration::from_secs(1)).await;
+
+            ctx.stop().await?;
+
+            Ok(())
+        })
+        .unwrap()
+        .unwrap();
 }
