@@ -1,7 +1,7 @@
 use std::net::{SocketAddr, TcpListener};
 use std::str::FromStr;
 
-use ockam_core::Result;
+use ockam_core::{Address, Result};
 use ockam_multiaddr::proto::{Node, Project, Service};
 use ockam_multiaddr::{MultiAddr, Protocol};
 
@@ -49,6 +49,11 @@ pub fn extract_address_value(input: &str) -> Result<String, ApiError> {
         )));
     }
     Ok(addr)
+}
+
+pub fn extract_address(input: &str) -> Result<Address, ApiError> {
+    let value = extract_address_value(input)?;
+    Ok(Address::from(value))
 }
 
 pub fn get_free_address() -> Result<SocketAddr, ApiError> {

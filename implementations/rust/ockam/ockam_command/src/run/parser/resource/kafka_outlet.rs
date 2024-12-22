@@ -54,6 +54,7 @@ impl KafkaOutlet {
 mod tests {
     use super::*;
     use ockam::transport::SchemeHostnamePort;
+    use ockam_core::Address;
 
     #[test]
     fn kafka_outlet_config() {
@@ -84,7 +85,7 @@ mod tests {
         let cmds = parsed
             .into_parsed_commands(Some(&default_node_name))
             .unwrap();
-        assert_eq!(cmds[0].name, "ko".to_string());
+        assert_eq!(cmds[0].name.clone(), Address::from("ko"));
         assert_eq!(cmds[0].node_opts.at_node.as_ref(), Some(&default_node_name));
 
         // check if the default node name is used when the configuration does not specify it

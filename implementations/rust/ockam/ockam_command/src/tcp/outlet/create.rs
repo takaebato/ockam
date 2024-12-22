@@ -10,7 +10,7 @@ use ockam::transport::SchemeHostnamePort;
 use ockam::Address;
 use ockam::Context;
 use ockam_abac::PolicyExpression;
-use ockam_api::address::extract_address_value;
+use ockam_api::address::{extract_address, extract_address_value};
 use ockam_api::cli_state::journeys::{
     JourneyEvent, NODE_NAME, TCP_OUTLET_AT, TCP_OUTLET_FROM, TCP_OUTLET_TO,
 };
@@ -36,8 +36,8 @@ pub struct CreateCommand {
     /// Examples are `/service/my-outlet` or `my-outlet`.
     /// If not provided, `outlet` will be used, or a random address will be generated if `outlet` is taken.
     /// You will need this address when creating a TCP Inlet using `ockam tcp-inlet create`.
-    #[arg(value_parser = extract_address_value)]
-    pub name: Option<String>,
+    #[arg(value_parser = extract_address)]
+    pub name: Option<Address>,
 
     /// TCP address where your TCP server is running: domain:port. Your Outlet will send raw TCP traffic to it
     #[arg(long, id = "SOCKET_ADDRESS", display_order = 900, value_parser = hostname_parser)]
@@ -49,8 +49,8 @@ pub struct CreateCommand {
 
     /// Alternative to the <NAME> positional argument.
     /// Address of your TCP Outlet, which is part of a route used in other commands.
-    #[arg(long, display_order = 902, id = "OUTLET_ADDRESS", value_parser = extract_address_value)]
-    pub from: Option<String>,
+    #[arg(long, display_order = 902, id = "OUTLET_ADDRESS", value_parser = extract_address)]
+    pub from: Option<Address>,
 
     /// Your TCP Outlet will be created on this node. If you don't provide it, the default
     /// node will be used

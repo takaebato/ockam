@@ -9,14 +9,15 @@ use std::fmt::Write;
 use ockam::transport::SchemeHostnamePort;
 use ockam::Context;
 use ockam_abac::PolicyExpression;
-use ockam_api::address::extract_address_value;
+use ockam_api::address::extract_address;
 use ockam_api::colors::{color_primary, color_warn};
 use ockam_api::nodes::models::services::StartKafkaOutletRequest;
 use ockam_api::nodes::models::services::StartServiceRequest;
 use ockam_api::nodes::BackgroundNodeClient;
 use ockam_api::output::Output;
-use ockam_api::{fmt_log, fmt_ok, fmt_warn};
+use ockam_api::{fmt_log, fmt_ok, fmt_warn, DefaultAddress};
 use ockam_core::api::Request;
+use ockam_core::Address;
 
 use crate::node::util::initialize_default_node;
 use crate::util::parsers::hostname_parser;
@@ -34,16 +35,16 @@ pub struct CreateCommand {
     /// Examples are `/service/my-outlet` or `my-outlet`.
     /// If not provided, `/service/kafka_outlet` will be used.
     /// You will need this address when creating a Kafka Inlet using `ockam kafka-inlet create`.
-    #[arg(default_value_t = kafka_default_outlet_addr(), value_parser = extract_address_value)]
-    pub name: String,
+    #[arg(default_value = DefaultAddress::KAFKA_OUTLET, value_parser = extract_address)]
+    pub name: Address,
 
     #[command(flatten)]
     pub node_opts: NodeOpts,
 
     /// Alternative to the <NAME> positional argument.
     /// Address of your Kafka Outlet, which is part of a route used in other commands.
-    #[arg(long, id = "OUTLET_ADDRESS", visible_alias = "addr", default_value_t = kafka_default_outlet_addr(), value_parser = extract_address_value)]
-    pub from: String,
+    #[arg(long, id = "OUTLET_ADDRESS", visible_alias = "addr", default_value = DefaultAddress::KAFKA_OUTLET, value_parser = extract_address)]
+    pub from: Address,
 
     /// The address of the kafka bootstrap broker
     #[arg(long, visible_alias = "to", default_value_t = kafka_default_outlet_server(), value_parser = hostname_parser)]
@@ -83,7 +84,7 @@ impl Command for CreateCommand {
                 cmd.tls || cmd.bootstrap_server.is_tls(),
                 cmd.policy_expression,
             );
-            let payload = StartServiceRequest::new(payload, &cmd.name);
+            let payload = StartServiceRequest::new(payload, cmd.name);
             let req = Request::post("/node/services/kafka_outlet").body(payload);
             let node =
                 BackgroundNodeClient::create(ctx, &opts.state, &cmd.node_opts.at_node).await?;
@@ -109,8 +110,8 @@ impl Command for CreateCommand {
 
 impl CreateCommand {
     async fn parse_args(mut self, opts: &CommandGlobalOpts) -> miette::Result<Self> {
-        if self.from != kafka_default_outlet_addr() {
-            if self.name != kafka_default_outlet_addr() {
+        if self.from != kafka_default_outlet_addr().into() {
+            if self.name != kafka_default_outlet_addr().into() {
                 opts.terminal.write_line(
                     fmt_warn!("The <NAME> argument is being overridden by the --from/--addr flag")
                         + &fmt_log!(

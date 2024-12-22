@@ -52,6 +52,7 @@ impl InfluxDBOutlets {
 mod tests {
     use super::*;
     use ockam::transport::SchemeHostnamePort;
+    use ockam_core::Address;
 
     #[test]
     fn tcp_outlet_config() {
@@ -74,13 +75,13 @@ mod tests {
             .into_parsed_commands(Some(&default_node_name))
             .unwrap();
         assert_eq!(cmds.len(), 2);
-        assert_eq!(cmds[0].name, Some("ti1".to_string()));
-        assert_eq!(cmds[0].from.clone().unwrap(), "my_outlet");
+        assert_eq!(cmds[0].name.clone().unwrap(), Address::from("ti1"));
+        assert_eq!(cmds[0].from.clone().unwrap(), Address::from("my_outlet"));
         assert_eq!(
             cmds[0].to,
             SchemeHostnamePort::new("tcp", "127.0.0.1", 6060).unwrap()
         );
-        assert_eq!(cmds[1].name, Some("ti2".to_string()));
+        assert_eq!(cmds[1].name.clone().unwrap(), Address::from("ti2"));
         assert!(cmds[1].from.is_none());
     }
 }

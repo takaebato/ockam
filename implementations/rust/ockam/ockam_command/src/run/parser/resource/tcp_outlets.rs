@@ -53,6 +53,7 @@ impl TcpOutlets {
 mod tests {
     use super::*;
     use ockam::transport::SchemeHostnamePort;
+    use ockam_core::Address;
     use std::str::FromStr;
 
     #[test]
@@ -72,15 +73,15 @@ mod tests {
             .into_parsed_commands(Some(&default_node_name))
             .unwrap();
         assert_eq!(cmds.len(), 2);
-        assert_eq!(cmds[0].name.clone().unwrap(), "to1");
+        assert_eq!(cmds[0].name.clone().unwrap(), Address::from("to1"));
         assert!(cmds[0].from.is_none());
         assert_eq!(
             cmds[0].to,
             SchemeHostnamePort::from_str("tcp://127.0.0.1:6060").unwrap()
         );
         assert_eq!(cmds[0].at.as_ref().unwrap(), "n");
-        assert_eq!(cmds[1].name.clone().unwrap(), "to2");
-        assert_eq!(cmds[1].from.clone().unwrap(), "my_outlet");
+        assert_eq!(cmds[1].name.clone().unwrap(), Address::from("to2"));
+        assert_eq!(cmds[1].from.clone().unwrap(), Address::from("my_outlet"));
         assert_eq!(
             cmds[1].to,
             SchemeHostnamePort::from_str("tls://127.0.0.1:6061").unwrap()

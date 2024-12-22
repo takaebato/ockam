@@ -10,7 +10,7 @@ use miette::miette;
 use ockam::transport::SchemeHostnamePort;
 use ockam::{Address, Context};
 use ockam_abac::PolicyExpression;
-use ockam_api::address::extract_address_value;
+use ockam_api::address::{extract_address, extract_address_value};
 use ockam_api::colors::color_primary;
 use ockam_api::influxdb::portal::{InfluxDBOutletConfig, LeaseManagerConfig};
 use ockam_api::influxdb::InfluxDBPortals;
@@ -26,8 +26,8 @@ pub struct CreateCommand {
     /// Examples are `/service/my-outlet` or `my-outlet`.
     /// If not provided, `outlet` will be used, or a random address will be generated if `outlet` is taken.
     /// You will need this address when creating a InfluxDB Inlet using `ockam influxdb-inlet create`.
-    #[arg(value_parser = extract_address_value)]
-    pub name: Option<String>,
+    #[arg(value_parser = extract_address)]
+    pub name: Option<Address>,
 
     /// Address where your InfluxDB server is running, in the format `<scheme>://<hostname>:<port>`.
     /// At least the port must be provided. The default scheme is `tcp` and the default hostname is `127.0.0.1`.
@@ -40,8 +40,8 @@ pub struct CreateCommand {
 
     /// Alternative to the <NAME> positional argument.
     /// Address of your InfluxDB Outlet, which is part of a route used in other commands.
-    #[arg(long, display_order = 902, id = "OUTLET_ADDRESS", value_parser = extract_address_value)]
-    pub from: Option<String>,
+    #[arg(long, display_order = 902, id = "OUTLET_ADDRESS", value_parser = extract_address)]
+    pub from: Option<Address>,
 
     /// Your InfluxDB Outlet will be created on this node. If you don't provide it, the default
     /// node will be used
